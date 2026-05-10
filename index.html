@@ -1,0 +1,3026 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>ניהול שווקים של יסכה רפאל</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+:root {
+  --primary: #1B5E20; --primary-light: #4CAF50; --primary-dark: #0D3311;
+  --accent: #D32F2F; --bg: #F8F9FA; --surface: #FFFFFF;
+  --text: #212121; --text-secondary: #546E7A; --border: #CFD8DC;
+  --shadow: 0 4px 6px rgba(0,0,0,0.05); --radius: 16px;
+}
+.dark { --bg: #121212; --surface: #1E1E1E; --text: #ECEFF1; --text-secondary: #B0BEC5; --border: #37474F; }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); direction: rtl; padding-bottom: 85px; }
+
+.header { position: sticky; top:0; z-index: 100; background: linear-gradient(135deg, var(--primary-dark), var(--primary)); color: #fff; padding: 0 20px; height: 64px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.header-title { font-size: 20px; font-weight: 800; }
+.app-logo { height:44px; width:auto; max-width:92px; object-fit:contain; display:block; filter:drop-shadow(0 1px 3px rgba(0,0,0,0.3)); flex-shrink:0; background:#fff; border-radius:8px; padding:2px; }
+.logo-fallback { height:44px; min-width:44px; padding:0 8px; border-radius:8px; background:#fff; color:#1B5E20; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:13px; line-height:1.1; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+
+.search-bar { padding: 16px 20px 8px; background: var(--bg); position: sticky; top: 64px; z-index: 90; }
+.search-input-wrap { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 16px; box-shadow: var(--shadow); }
+.search-input { flex:1; border:none; background:none; padding: 14px 0; font-size: 16px; color: var(--text); outline:none; }
+
+.stats-section { padding: 15px 20px; }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stat-card { background: var(--surface); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); text-align: center; border-bottom: 4px solid var(--primary-light); }
+.stat-value { font-size: 24px; font-weight: 800; color: var(--primary); }
+.stat-label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; font-weight: 600; }
+.stat-card.wide { grid-column: 1 / -1; text-align: right; }
+.stat-breakdown { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.stat-tag { font-size: 12px; padding: 6px 12px; border-radius: 10px; background: #E8F5E9; color: var(--primary); font-weight: 700; border: 1px solid rgba(27,94,32,0.1); }
+
+.records-section { padding: 0 20px; }
+.record-card { background: var(--surface); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); border-right: 6px solid var(--primary); }
+.record-card.status-sent { border-right-color: #43A047; }
+.record-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+.record-status { font-size: 11px; padding: 4px 10px; border-radius: 8px; font-weight: 800; }
+.record-status.sent { background: #E8F5E9; color: #2E7D32; }
+.record-status.pending { background: #FFF3E0; color: #EF6C00; }
+
+.btn { width: 100%; padding: 15px; border-radius: var(--radius); border: none; background: var(--primary); color: #fff; font-size: 18px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow); }
+.rec-btn { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
+
+.modal-overlay { position: fixed; inset:0; z-index: 200; background: rgba(0,0,0,0.6); display: none; align-items: flex-end; justify-content: center; }
+.modal { background: var(--bg); width: 100%; max-width: 500px; border-radius: 24px 24px 0 0; padding: 20px; max-height: 90vh; overflow-y: auto; }
+
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 75px; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; z-index: 100; }
+.bottom-btn { flex: 1; display: flex; flex-direction: column; align-items: center; background: none; border: none; color: var(--text-secondary); font-size: 11px; cursor: pointer; }
+.bottom-btn.active { color: var(--primary); font-weight: 800; }
+
+.toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 12px 24px; border-radius: 12px; display: none; z-index: 1000; }
+.analytics-shell { display: grid; gap: 16px; }
+.analytics-hero { background: linear-gradient(135deg, rgba(27,94,32,0.14), rgba(76,175,80,0.06) 55%, rgba(255,255,255,0.5)); border-radius: 24px; padding: 20px; box-shadow: var(--shadow); border: 1px solid rgba(27,94,32,0.08); display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.analytics-eyebrow { font-size: 12px; font-weight: 800; color: var(--primary); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
+.analytics-hero h3 { font-size: 24px; margin-bottom: 8px; }
+.analytics-hero p { color: var(--text-secondary); line-height: 1.6; font-size: 13px; }
+.analytics-mini-kpi { min-width: 150px; background: rgba(255,255,255,0.7); border: 1px solid rgba(27,94,32,0.12); border-radius: 18px; padding: 14px 16px; text-align: center; }
+.analytics-mini-kpi b { display: block; color: var(--primary); font-size: 18px; margin-bottom: 4px; }
+.filter-chip-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.filter-chip { border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 800; cursor: pointer; transition: 0.2s ease; box-shadow: var(--shadow); }
+.filter-chip.active { background: linear-gradient(135deg, var(--primary-dark), var(--primary-light)); color: #fff; border-color: transparent; transform: translateY(-1px); }
+.analytics-panel { background: var(--surface); border-radius: 24px; padding: 18px; box-shadow: var(--shadow); border: 1px solid rgba(27,94,32,0.08); }
+.analytics-panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.analytics-panel-head h3 { font-size: 19px; margin-bottom: 4px; }
+.analytics-panel-head p { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.analytics-badge { border-radius: 999px; background: #E8F5E9; color: var(--primary); padding: 8px 12px; font-weight: 800; font-size: 12px; border: 1px solid rgba(27,94,32,0.12); }
+.analytics-chart-wrap { background: linear-gradient(180deg, rgba(27,94,32,0.05), rgba(255,255,255,0.4)); border: 1px solid rgba(27,94,32,0.08); border-radius: 22px; padding: 10px; overflow: hidden; }
+.analytics-chart-image { width: 100%; display: block; border-radius: 18px; }
+.chart-empty { background: linear-gradient(135deg, rgba(27,94,32,0.06), rgba(207,216,220,0.24)); border-radius: 18px; padding: 38px 18px; text-align: center; color: var(--text-secondary); font-size: 13px; line-height: 1.8; }
+.analytics-table { display: grid; gap: 10px; }
+.analytics-row { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; background: rgba(232,245,233,0.42); border: 1px solid rgba(27,94,32,0.08); border-radius: 18px; padding: 12px 14px; }
+.analytics-rank { width: 38px; height: 38px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--primary-dark), var(--primary-light)); color: #fff; font-weight: 800; box-shadow: var(--shadow); }
+.analytics-name { font-weight: 800; }
+.analytics-subtext { display: block; color: var(--text-secondary); font-size: 11px; margin-top: 4px; }
+.analytics-value { font-weight: 900; color: var(--primary); font-size: 18px; direction: ltr; }
+.quick-export { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.report-context-card { background: linear-gradient(135deg, rgba(27,94,32,0.12), rgba(255,255,255,0.7)); border-radius: 22px; padding: 18px; box-shadow: var(--shadow); border: 1px solid rgba(27,94,32,0.08); margin-bottom: 18px; }
+.report-context-card h3 { font-size: 20px; margin-bottom: 8px; }
+.report-context-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 12px; }
+.report-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-tag { background: rgba(255,255,255,0.82); border: 1px solid rgba(27,94,32,0.1); border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 800; color: var(--primary); }
+@media (max-width: 760px) {
+  body { font-size: 13px; padding-bottom: 76px; }
+  .header { height: 50px; padding: 0 10px; }
+  .header > div { min-width: 0; }
+  .app-logo { height: 32px; max-width: 70px; border-radius: 6px; }
+  .header-title { font-size: 13px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100vw - 130px); }
+  .search-bar { top: 50px; padding: 8px 8px 5px; }
+  .search-input-wrap { border-radius: 10px; padding: 0 10px; }
+  .search-input { padding: 9px 0; font-size: 13px; }
+  .stats-section { padding: 8px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 7px; }
+  .stat-card { border-radius: 10px; padding: 9px; border-bottom-width: 3px; }
+  .stat-card.wide { padding: 8px; }
+  .stat-value { font-size: 18px; }
+  .stat-label { font-size: 10px; }
+  .stat-breakdown { gap: 4px; padding-left: 2px; }
+  .stat-tag { font-size: 10px; padding: 4px 6px; border-radius: 7px; }
+  .records-section { padding: 0 8px; }
+  .record-card { border-radius: 12px; padding: 11px; margin-bottom: 8px; border-right-width: 4px; font-size: 12px; }
+  .record-header { margin-bottom: 6px; }
+  .btn { padding: 11px; border-radius: 11px; font-size: 14px; }
+  .rec-btn { padding: 8px; border-radius: 9px; font-size: 11px; min-height: 34px; }
+  .modal { border-radius: 18px 18px 0 0; padding: 14px; max-height: 92vh; }
+  .modal input, .modal select, .modal textarea { font-size: 14px !important; padding: 10px !important; margin-bottom: 8px !important; }
+  .bottom-bar { height: 66px; overflow-x: auto; }
+  .bottom-btn { min-width: 56px; font-size: 9px; }
+  .analytics-hero { flex-direction: column; }
+  .analytics-mini-kpi { width: 100%; }
+  .quick-export { grid-template-columns: 1fr; }
+  .analytics-row { grid-template-columns: 46px 1fr; }
+  .analytics-value { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div style="display:flex; align-items:center; gap:10px;">
+    <img id="appHeaderLogo" class="app-logo" src="" alt="לוגו" loading="eager">
+    <span class="header-title">ניהול שווקים של יסכה רפאל</span>
+  </div>
+  <button class="rec-btn" style="flex:0; min-width:44px; background:none; border:none; color:white; font-size:20px;" onclick="toggleDarkMode()">🌓</button>
+</header>
+
+<div id="searchBar" class="search-bar">
+  <div class="search-input-wrap">
+    <input class="search-input" type="text" placeholder="חיפוש חווה או משחטה..." id="searchInput" oninput="render()">
+    <span style="font-size:18px;">🔍</span>
+  </div>
+</div>
+
+<main id="homeView">
+  <div class="stats-section" id="statsSection"></div>
+
+  <div style="padding: 0 16px 10px; display: flex; gap: 10px;">
+    <button class="rec-btn" style="background:#E3F2FD; color:#C62828; border-color:#FFCDD2;" onclick="pullFromCloud()">📥 משוך מהענן</button>
+    <button class="rec-btn" onclick="copyYesterday()">📋 העתק מאתמול</button>
+    <button class="btn" style="flex: 1.5;" onclick="openModal()">+ שיווק חדש</button>
+  </div>
+  <div id="recordsList" class="records-section"></div>
+</main>
+
+<main id="historyView" style="display:none;">
+  <div style="padding: 15px 20px 6px; font-weight:800; color:var(--primary); font-size:18px;">📜 היסטוריית שיווקים</div>
+  <div style="padding: 0 20px 10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+    <span style="font-size:12px; font-weight:700; color:var(--text-secondary);">סינון:</span>
+    <button id="kfAll" class="filter-chip active" onclick="setKashrutFilter('')">הכל</button>
+    <button id="kfRegular" class="filter-chip" onclick="setKashrutFilter('רגיל')">רגיל</button>
+    <button id="kfMehadrin" class="filter-chip" onclick="setKashrutFilter('מהדרין')">מהדרין</button>
+    <button id="kfChalak" class="filter-chip" onclick="setKashrutFilter('חלק')">חלק</button>
+  </div>
+  <div id="historyList" class="records-section"></div>
+</main>
+
+<main id="statisticsView" style="display:none; padding: 20px;">
+  <div class="analytics-shell">
+    <div class="analytics-hero">
+      <div>
+        <div class="analytics-eyebrow">Analytics Center</div>
+        <h3>סטטיסטיקה חכמה לפי כל הנתונים</h3>
+        <p>צפה בניתוח לפי יום, שבוע, חודש או שנה. ניתן להחליף את הגרף בין חוות למשחטות ולהפיק ממנו דוח מקצועי ל-PDF או Excel.</p>
+      </div>
+      <div class="analytics-mini-kpi">
+        <b id="analyticsRecordsCount">0</b>
+        <span style="font-size:12px; color:var(--text-secondary);">רשומות בטווח שנבחר</span>
+      </div>
+    </div>
+    <div id="periodFilters" class="filter-chip-row"></div>
+    <div id="groupFilters" class="filter-chip-row"></div>
+    <div id="analyticsCards" class="stats-grid"></div>
+    <div class="analytics-panel">
+      <div class="analytics-panel-head">
+        <div>
+          <h3 id="analyticsTitle">גרף פילוח</h3>
+          <p id="analyticsSubtitle">ממתין לנתונים</p>
+        </div>
+        <div class="analytics-badge" id="analyticsBadge">ללא נתונים</div>
+      </div>
+      <div id="analyticsChart" class="analytics-chart-wrap"></div>
+    </div>
+    <div class="analytics-panel">
+      <div class="analytics-panel-head">
+        <div>
+          <h3>טבלת דירוג</h3>
+          <p>רשימת המובילים לפי הבחירה הפעילה.</p>
+        </div>
+      </div>
+      <div id="analyticsTable" class="analytics-table"></div>
+    </div>
+    <div class="quick-export" style="grid-template-columns: 1fr;">
+      <button class="btn" style="background:#217346; display:flex; align-items:center; justify-content:center; gap:10px;" onclick="exportExcel()">
+        <span style="font-size:22px;">📊</span> Excel מקצועי
+      </button>
+    </div>
+  </div>
+</main>
+
+<main id="reportsView" style="display:none; padding: 20px;">
+  <div class="stat-card wide" style="margin-bottom:20px; text-align:center; border-bottom: none; border-top: 4px solid var(--primary);">
+    <h3 style="margin-bottom:10px;">מרכז הפקת דוחות יומיים</h3>
+    <p style="font-size:12px; color:var(--text-secondary);">הדוחות מופקים על סמך נתוני היום בלבד עם פילוח משחטות וחוות.</p>
+  </div>
+  <div id="reportsContext"></div>
+  <div style="display:grid; gap:15px;">
+    <button class="btn" style="background:#217346; display:flex; align-items:center; justify-content:center; gap:10px;" onclick="exportDailyExcel()">
+      <span style="font-size:24px;">📊</span> דוח יומי לאקסל
+    </button>
+    <button class="btn" style="background:#1565C0; display:flex; align-items:center; justify-content:center; gap:10px;" onclick="exportPlanVsActualExcel()">
+      <span style="font-size:24px;">📈</span> תכנון מול ביצוע יומי — Excel
+    </button>
+    <button class="btn" style="background:#D32F2F; display:flex; align-items:center; justify-content:center; gap:10px;" onclick="exportPDF()">
+      <span style="font-size:24px;">📄</span> הפק דוח יומי ל-PDF
+    </button>
+    <button class="btn" style="background:#25D366; display:flex; align-items:center; justify-content:center; gap:10px;" onclick="sendWhatsApp()">
+      <span style="font-size:24px;">📱</span> שלח סיכום יומי לוואטסאפ
+    </button>
+  </div>
+</main>
+
+<main id="planView" style="display:none; padding:0;">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#1B5E20,#388E3C); padding:16px 18px; color:#fff;">
+    <div style="font-size:11px; font-weight:700; opacity:0.7; letter-spacing:1px;">לוח תכנון שחיטות</div>
+    <div style="font-size:20px; font-weight:800; margin-top:2px;">📋 תכנון שחיטות מול ביצוע</div>
+  </div>
+
+  <!-- Controls bar -->
+  <div style="background:var(--surface); padding:12px 16px; box-shadow:var(--shadow); display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <select id="planNavYear" onchange="planNavigate()" style="padding:8px 10px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:13px; font-weight:700;"></select>
+    <select id="planNavMonth" onchange="planNavigate()" style="padding:8px 10px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:13px; font-weight:700;">
+      <option value="0">ינואר</option><option value="1">פברואר</option><option value="2">מרץ</option>
+      <option value="3">אפריל</option><option value="4">מאי</option><option value="5">יוני</option>
+      <option value="6">יולי</option><option value="7">אוגוסט</option><option value="8">ספטמבר</option>
+      <option value="9">אוקטובר</option><option value="10">נובמבר</option><option value="11">דצמבר</option>
+    </select>
+    <button onclick="planPrevMonth()" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:none; color:var(--text); font-weight:800; cursor:pointer;">◀</button>
+    <button onclick="planNextMonth()" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:none; color:var(--text); font-weight:800; cursor:pointer;">▶</button>
+    <button onclick="planToday()" style="padding:8px 12px; border-radius:10px; border:none; background:#E8F5E9; color:#1B5E20; font-weight:800; font-size:12px; cursor:pointer;">היום</button>
+    <button onclick="exportPlanExcel()" style="margin-right:auto; padding:8px 14px; border-radius:10px; border:none; background:#217346; color:#fff; font-weight:800; font-size:12px; cursor:pointer;">📊 יצוא Excel</button>
+  </div>
+
+  <!-- Plan grid -->
+  <div id="planDailyGrid" style="overflow:auto; max-height:calc(100vh - 205px); padding:0 0 80px 0;"></div>
+
+  <!-- Summary bar -->
+  <div id="planMonthlySummary" style="padding:12px 16px;"></div>
+
+</main>
+
+<!-- Plan cell edit modal -->
+<div id="planModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.6); align-items:flex-end; justify-content:center;">
+  <div style="background:var(--surface); border-radius:20px 20px 0 0; padding:24px; width:100%; max-width:500px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <h3 id="planModalTitle" style="font-size:16px; font-weight:800;"></h3>
+      <button onclick="closePlanModal()" style="border:none; background:none; font-size:24px; cursor:pointer;">✕</button>
+    </div>
+    <div id="planModalSub" style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;"></div>
+    <label style="font-size:12px; font-weight:700; display:block; margin-bottom:8px;">יעד דרישה (כמות עופות)</label>
+    <input id="planTargetInput" type="number" inputmode="numeric" placeholder="הכנס כמות..."
+      style="width:100%; padding:16px; border-radius:12px; border:2px solid var(--border); background:var(--surface); color:var(--text); font-size:22px; font-weight:800; text-align:center; margin-bottom:8px;">
+    <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;" id="planQuickBtns"></div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="savePlanTarget()" style="flex:1; padding:14px; border-radius:14px; border:none; background:#1B5E20; color:#fff; font-size:15px; font-weight:800; cursor:pointer;">💾 שמור</button>
+      <button onclick="clearPlanTarget()" style="padding:14px 16px; border-radius:14px; border:1px solid #D32F2F; background:none; color:#D32F2F; font-weight:800; cursor:pointer;">🗑️</button>
+    </div>
+  </div>
+</div>
+
+<main id="settingsView" style="display:none; padding: 20px;">
+
+  <div style="background:var(--surface); padding:20px; border-radius:20px; box-shadow:var(--shadow); margin-bottom:16px;">
+    <div style="font-weight:800; font-size:16px; margin-bottom:14px; color:var(--primary);">🔗 סנכרון גוגל</div>
+    <label style="display:block; margin-bottom:8px; font-weight:700; font-size:13px;">כתובת סנכרון</label>
+    <input class="rec-btn" id="gsUrl" style="width:100%; text-align:left; padding:12px; font-weight:normal; margin-bottom:12px;" oninput="saveGsUrl()">
+    <label style="display:block; margin-bottom:8px; font-weight:700; font-size:13px;">☁️ סנכרון אוטומטי</label>
+    <select id="autoSyncSelect" onchange="saveAutoSync()" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:14px;">
+      <option value="0">כבוי</option>
+      <option value="5">כל 5 דקות</option>
+      <option value="15">כל 15 דקות</option>
+      <option value="30">כל 30 דקות</option>
+    </select>
+    <div id="lastSyncLabel" style="font-size:11px; color:var(--text-secondary); margin-top:8px;"></div>
+  </div>
+
+  <div style="background:var(--surface); padding:20px; border-radius:20px; box-shadow:var(--shadow); margin-bottom:16px;">
+    <div style="font-weight:800; font-size:16px; margin-bottom:14px; color:var(--primary);">🔒 אבטחה</div>
+    <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">קוד PIN בן 4 ספרות יידרש בכל פתיחת האפליקציה</div>
+    <div style="display:flex; gap:10px;">
+      <button class="rec-btn" style="flex:1;" onclick="setPin()">🔑 הגדר PIN</button>
+      <button class="rec-btn" style="flex:1; color:var(--accent);" onclick="clearPin()">🔓 בטל PIN</button>
+    </div>
+    <div id="pinStatus" style="font-size:12px; margin-top:8px; font-weight:700;"></div>
+  </div>
+
+  <div style="background:var(--surface); padding:20px; border-radius:20px; box-shadow:var(--shadow); margin-bottom:16px;">
+    <div style="font-weight:800; font-size:16px; margin-bottom:14px; color:var(--primary);">📋 תבניות שמורות</div>
+    <div id="settingsTemplates" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    <div style="font-size:11px; color:var(--text-secondary); margin-top:8px;">ניתן לשמור תבניות דרך כפתור "שמור כתבנית" בטופס הוספה</div>
+  </div>
+
+  <div style="background:var(--surface); padding:20px; border-radius:20px; box-shadow:var(--shadow); margin-bottom:16px;">
+    <div style="font-weight:800; font-size:16px; margin-bottom:14px; color:var(--primary);">💾 גיבוי ושחזור</div>
+    <div style="display:flex; gap:10px;">
+      <button class="rec-btn" style="flex:1;" onclick="backupData()">📥 גיבוי</button>
+      <button class="rec-btn" style="flex:1;" onclick="document.getElementById('restoreFile').click()">📤 שחזור</button>
+      <input type="file" id="restoreFile" style="display:none" onchange="restoreData(event)">
+    </div>
+  </div>
+
+  <div style="background:var(--surface); padding:20px; border-radius:20px; box-shadow:var(--shadow);">
+    <div style="font-weight:800; font-size:16px; margin-bottom:14px; color:var(--primary);">🎨 מראה</div>
+    <button class="rec-btn" style="width:100%;" onclick="toggleDarkMode()">🌓 החלף מצב כהה/בהיר</button>
+  </div>
+
+</main>
+
+<nav class="bottom-bar">
+  <button class="bottom-btn active" id="navHome" onclick="switchTab('home')">
+    <span style="font-size:20px; margin-bottom:4px;">🏠</span>ראשי
+  </button>
+  <button class="bottom-btn" id="navHistory" onclick="switchTab('history')">
+    <span style="font-size:20px; margin-bottom:4px;">📜</span>היסטוריה
+  </button>
+  <button class="bottom-btn" id="navStatistics" onclick="switchTab('statistics')">
+    <span style="font-size:20px; margin-bottom:4px;">📈</span>סטטיסטיקה
+  </button>
+  <button class="bottom-btn" id="navReports" onclick="switchTab('reports')">
+    <span style="font-size:20px; margin-bottom:4px;">📊</span>דוחות
+  </button>
+  <button class="bottom-btn" id="navPlan" onclick="switchTab('plan')">
+    <span style="font-size:20px; margin-bottom:4px;">🗓️</span>תוכנית
+  </button>
+  <button class="bottom-btn" id="navSettings" onclick="switchTab('settings')">
+    <span style="font-size:20px; margin-bottom:4px;">⚙️</span>הגדרות
+  </button>
+</nav>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+      <h2 id="formTitle" style="font-size:20px;">פרטי שיווק</h2>
+      <button onclick="closeModal()" style="border:none; background:none; font-size:24px; cursor:pointer;">✕</button>
+    </div>
+    
+    <label style="font-size:12px; font-weight:700;">📅 תאריך ושעה (אוטומטי)</label>
+    <input style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border);" type="datetime-local" id="fDate">
+    <div style="position:relative; margin-bottom:10px;">
+      <input style="width:100%; padding:12px 12px 12px 96px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:15px;" type="text" id="fFarm" placeholder="שם החווה" autocomplete="off" oninput="renderFarmSuggestions()" onfocus="renderFarmSuggestions()" onblur="setTimeout(hideFarmSuggestions, 180)">
+      <button type="button" onclick="enableManualFarm()" style="position:absolute; left:8px; top:50%; transform:translateY(-50%); border:1px dashed var(--primary); background:#E8F5E9; color:var(--primary); border-radius:8px; padding:7px 10px; font-size:12px; font-weight:800; cursor:pointer;">+ ידני</button>
+      <div id="farmSuggestions" style="display:none; position:absolute; top:calc(100% + 4px); right:0; left:0; z-index:300; max-height:220px; overflow-y:auto; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.16);"></div>
+    </div>
+    <input style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border);" type="number" id="fQty" placeholder="כמות עופות" inputmode="numeric">
+    <select id="fSlaughterSelect" onchange="handleSlaughterSelect()" style="width:100%; padding:12px; margin-bottom:6px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:15px;">
+      <option value="">— בחר משחטה —</option>
+      <option value="מעוף">🏭 מעוף</option>
+      <option value="טרי וחלק">🏭 טרי וחלק</option>
+      <option value="מישור">🏭 מישור</option>
+      <option value="אשקלון">🏭 אשקלון</option>
+      <option value="עטרות">🏭 עטרות</option>
+      <option value="מעוף 2">🏭 מעוף 2</option>
+      <optgroup label="— חיצוניות —">
+        <option value="סלק אל קודס">🏭 סלק אל קודס</option>
+        <option value="חוסם (תרקומייה)">🏭 חוסם (תרקומייה)</option>
+      </optgroup>
+      <option value="__other__">✏️ אחר (הכנס ידנית)</option>
+    </select>
+    <input style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border); display:none;" type="text" id="fSlaughter" placeholder="שם משחטה (ידני)">
+    <input style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border);" type="text" id="fKashrut" placeholder="סוג כשרות">
+    <textarea style="width:100%; padding:12px; height:60px; margin-bottom:15px; border-radius:8px; border:1px solid var(--border); font-family:inherit;" id="fNotes" placeholder="הערות..."></textarea>
+    
+    <div style="margin-bottom:12px;">
+      <div style="font-size:12px; font-weight:700; margin-bottom:7px;">📋 תבניות שמורות (לחץ לטעינה)</div>
+      <div id="templateChips" style="display:flex; flex-wrap:wrap; gap:6px; min-height:28px;"></div>
+      <button onclick="saveTemplate()" style="margin-top:8px; padding:7px 14px; border-radius:10px; border:1px dashed var(--primary); background:none; color:var(--primary); font-size:12px; font-weight:700; cursor:pointer;">＋ שמור כתבנית</button>
+    </div>
+
+    <button class="btn" onclick="saveRecord()">💾 שמור וסנכרן</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div id="pinOverlay" style="display:none; position:fixed; inset:0; z-index:9999; background:linear-gradient(135deg,#0D3311,#1B5E20); flex-direction:column; align-items:center; justify-content:center; padding:20px;">
+  <div id="pinLogoWrap" style="margin-bottom:18px;"></div>
+  <div style="color:#fff; font-size:20px; font-weight:800; margin-bottom:4px;">ניהול שווקים של יסכה רפאל</div>
+  <div style="color:rgba(255,255,255,0.6); font-size:13px; margin-bottom:26px;">הכנס קוד כניסה</div>
+  <div style="display:flex; gap:16px; margin-bottom:26px;" id="pinDots">
+    <div class="pin-dot" style="width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.25);transition:background 0.2s;"></div>
+    <div class="pin-dot" style="width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.25);transition:background 0.2s;"></div>
+    <div class="pin-dot" style="width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.25);transition:background 0.2s;"></div>
+    <div class="pin-dot" style="width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.25);transition:background 0.2s;"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:230px;">
+    <button onclick="pinPress('1')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">1</button>
+    <button onclick="pinPress('2')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">2</button>
+    <button onclick="pinPress('3')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">3</button>
+    <button onclick="pinPress('4')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">4</button>
+    <button onclick="pinPress('5')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">5</button>
+    <button onclick="pinPress('6')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">6</button>
+    <button onclick="pinPress('7')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">7</button>
+    <button onclick="pinPress('8')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">8</button>
+    <button onclick="pinPress('9')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">9</button>
+    <div></div>
+    <button onclick="pinPress('0')" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.13);color:#fff;font-size:22px;font-weight:700;cursor:pointer;">0</button>
+    <button onclick="pinDel()" style="padding:18px;border:none;border-radius:14px;background:rgba(255,255,255,0.08);color:#fff;font-size:20px;cursor:pointer;">⌫</button>
+  </div>
+  <div id="pinError" style="color:#FF8A80;margin-top:16px;font-size:13px;display:none;">קוד שגוי, נסה שוב</div>
+</div>
+
+<script>
+
+const LOGO_DATA_URL = "data:image/jpeg;base64,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";
+function initLogoImages() {
+  const fallback = '<div class="logo-fallback" aria-label="לוגו">יסכה<br>רפאל</div>';
+  const headerLogo = document.getElementById('appHeaderLogo');
+  if (headerLogo) {
+    headerLogo.onerror = function() { this.outerHTML = fallback; };
+    headerLogo.src = LOGO_DATA_URL;
+  }
+}
+const MASTER_URL = 'https://script.google.com/macros/s/AKfycbxfe0YOcEjXd3_aQJXpxPIJX6NRwd6leZ6HBaHJpwHER7kM2gt2cCyi6HlJjnZwjWYAVA/exec';
+const TAB_NAMES = ['home', 'history', 'statistics', 'reports', 'plan', 'settings'];
+const PERIOD_OPTIONS = [
+  { key: 'day', label: 'היום' },
+  { key: 'week', label: 'השבוע' },
+  { key: 'month', label: 'החודש' },
+  { key: 'year', label: 'השנה' }
+];
+const GROUP_OPTIONS = [
+  { key: 'farm', label: 'לפי חוות', icon: '🐓' },
+  { key: 'slaughterhouse', label: 'לפי משחטות', icon: '🏭' }
+];
+
+let records = [];
+let settings = { dark: false, gsUrl: MASTER_URL };
+let editingId = null;
+let currentTab = 'home';
+let statisticsState = { period: 'day', groupBy: 'farm' };
+
+try {
+  const savedData = localStorage.getItem('poultry_manager_data');
+  if (savedData) records = JSON.parse(savedData);
+} catch (e) { records = []; }
+
+try {
+  const savedSettings = localStorage.getItem('poultry_manager_settings');
+  if (savedSettings) settings = JSON.parse(savedSettings);
+} catch (e) {}
+
+function getSafeIsoDate() {
+  try {
+    const tzOffset = new Date().getTimezoneOffset() * 60000;
+    return new Date(Date.now() - tzOffset).toISOString().slice(0, 10);
+  } catch (e) {
+    return '2026-01-01';
+  }
+}
+
+function formatIsoDateDisplay(value) {
+  const parts = String(value || '').split('-');
+  if (parts.length !== 3) return value || '';
+  return `${parts[2]}.${parts[1]}.${parts[0]}`;
+}
+
+function formatDateHe(dt) {
+  if (!dt) return '';
+  try {
+    const d = new Date(dt);
+    return d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return dt;
+  }
+}
+
+function formatNumber(value) {
+  return (Number(value) || 0).toLocaleString('he-IL');
+}
+
+function formatPeriodLabel(period) {
+  const found = PERIOD_OPTIONS.find(item => item.key === period);
+  return found ? found.label : 'כל התקופות';
+}
+
+function formatGroupLabel(groupBy) {
+  return groupBy === 'slaughterhouse' ? 'משחטות' : 'חוות';
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeXml(value) {
+  return escapeHtml(value);
+}
+
+function truncateLabel(value, maxLen) {
+  const safe = String(value == null ? '' : value);
+  return safe.length > maxLen ? safe.slice(0, maxLen - 1) + '…' : safe;
+}
+
+function getDateKey(dateObj) {
+  const local = new Date(dateObj.getTime() - dateObj.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function startOfDay(dateObj) {
+  const d = new Date(dateObj);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function startOfWeek(dateObj) {
+  const d = startOfDay(dateObj);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+
+function startOfMonth(dateObj) {
+  return new Date(dateObj.getFullYear(), dateObj.getMonth(), 1);
+}
+
+function startOfYear(dateObj) {
+  return new Date(dateObj.getFullYear(), 0, 1);
+}
+
+function getPeriodRange(period) {
+  const now = new Date();
+  let start = startOfDay(now);
+  let endExclusive = new Date(start);
+  endExclusive.setDate(endExclusive.getDate() + 1);
+
+  if (period === 'week') {
+    start = startOfWeek(now);
+    endExclusive = new Date(start);
+    endExclusive.setDate(endExclusive.getDate() + 7);
+  } else if (period === 'month') {
+    start = startOfMonth(now);
+    endExclusive = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+  } else if (period === 'year') {
+    start = startOfYear(now);
+    endExclusive = new Date(start.getFullYear() + 1, 0, 1);
+  }
+
+  return { start, endExclusive };
+}
+
+function getRecordDate(record) {
+  if (!record || !record.datetime) return null;
+  const raw = String(record.datetime);
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeRecord(record) {
+  const safeRecord = record || {};
+  return {
+    id: safeRecord.id || Date.now().toString(36),
+    datetime: safeRecord.datetime || '',
+    parsedDate: getRecordDate(safeRecord),
+    farm: safeRecord.farm || '',
+    quantity: Number(safeRecord.quantity) || 0,
+    slaughterhouse: safeRecord.slaughterhouse || 'כללי',
+    kashrut: safeRecord.kashrut || 'רגיל',
+    notes: safeRecord.notes || '',
+    status: safeRecord.status || 'pending'
+  };
+}
+
+function getFilteredSearchRecords() {
+  const searchInput = document.getElementById('searchInput');
+  const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  return records.filter(record => {
+    if (!q) return true;
+    return (record.farm || '').toLowerCase().includes(q) || (record.slaughterhouse || '').toLowerCase().includes(q);
+  });
+}
+
+function getAnalyticsData(period, groupBy, sourceRecords) {
+  const range = getPeriodRange(period);
+  const normalized = (Array.isArray(sourceRecords) ? sourceRecords : records)
+    .map(normalizeRecord)
+    .filter(item => item.parsedDate && item.parsedDate >= range.start && item.parsedDate < range.endExclusive)
+    .sort((a, b) => b.parsedDate - a.parsedDate);
+
+  const totalsMap = {};
+  const trendMap = {};
+  const farms = new Set();
+  const slaughterhouses = new Set();
+  let totalQty = 0;
+
+  normalized.forEach(item => {
+    totalQty += item.quantity;
+    farms.add(item.farm || 'לא צוין');
+    slaughterhouses.add(item.slaughterhouse || 'כללי');
+
+    const groupKey = groupBy === 'slaughterhouse' ? (item.slaughterhouse || 'כללי') : (item.farm || 'לא צוין');
+    totalsMap[groupKey] = (totalsMap[groupKey] || 0) + item.quantity;
+
+    const dayKey = getDateKey(item.parsedDate);
+    trendMap[dayKey] = (trendMap[dayKey] || 0) + item.quantity;
+  });
+
+  const chartData = Object.keys(totalsMap)
+    .map(name => ({ name, quantity: totalsMap[name] }))
+    .sort((a, b) => b.quantity - a.quantity);
+
+  const trendData = Object.keys(trendMap)
+    .sort()
+    .map(label => ({ label, quantity: trendMap[label] }));
+
+  return {
+    period,
+    groupBy,
+    range,
+    records: normalized,
+    totalQty,
+    totalShipments: normalized.length,
+    averageQty: normalized.length ? Math.round(totalQty / normalized.length) : 0,
+    topItem: chartData[0] || null,
+    chartData,
+    trendData,
+    uniqueFarms: farms.size,
+    uniqueSlaughterhouses: slaughterhouses.size,
+    activeDays: trendData.length
+  };
+}
+
+function getDailyReportAnalytics() {
+  const todayKey = getSafeIsoDate();
+  const dailyRecords = records.filter(item => {
+    const d = getRecordDate(item);
+    if (!d) return false;
+    return getDateKey(d) === todayKey;
+  });
+  return getAnalyticsData('day', 'slaughterhouse', dailyRecords);
+}
+
+function toast(message) {
+  try {
+    const t = document.getElementById('toast');
+    t.innerText = message;
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 3000);
+  } catch (e) {
+    alert(message);
+  }
+}
+
+function getChartSvg(analytics) {
+  const items = analytics.chartData.slice(0, 8);
+  if (!items.length) return '';
+
+  const width = 820;
+  const barStart = 290;
+  const barMaxWidth = 450;
+  const rowHeight = 54;
+  const height = Math.max(240, 100 + items.length * rowHeight);
+  const maxValue = items[0].quantity || 1;
+  const title = escapeXml(`פילוח ${formatGroupLabel(analytics.groupBy)}`);
+  const subtitle = escapeXml(`${formatPeriodLabel(analytics.period)}`);
+  const themeBg = settings.dark ? '#102216' : '#F6FBF7';
+  const trackColor = settings.dark ? '#20352A' : '#E6F2E8';
+
+  const rows = items.map((item, index) => {
+    const y = 70 + index * rowHeight;
+    const widthValue = Math.max(20, Math.round((item.quantity / maxValue) * barMaxWidth));
+    const label = escapeXml(truncateLabel(item.name, 30));
+    const value = formatNumber(item.quantity);
+    const valueInside = widthValue > 96;
+    const valueX = valueInside ? barStart + widthValue - 12 : barStart + widthValue + 10;
+    const valueColor = valueInside ? '#FFFFFF' : '#1B5E20';
+    const anchor = valueInside ? 'end' : 'start';
+
+    return `
+      <text x="${barStart - 16}" y="${y + 18}" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#355A3C">${label}</text>
+      <rect x="${barStart}" y="${y}" width="${barMaxWidth}" height="24" rx="12" fill="${trackColor}" />
+      <rect x="${barStart}" y="${y}" width="${widthValue}" height="24" rx="12" fill="url(#barGradient)" />
+      <text x="${valueX}" y="${y + 17}" text-anchor="${anchor}" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="${valueColor}">${value}</text>
+    `;
+  }).join('');
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">
+      <defs>
+        <linearGradient id="barGradient" x1="0" x2="1">
+          <stop offset="0%" stop-color="#1B5E20"/>
+          <stop offset="100%" stop-color="#4CAF50"/>
+        </linearGradient>
+      </defs>
+      <rect width="${width}" height="${height}" rx="24" fill="${themeBg}" />
+      <text x="${width - 30}" y="40" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" fill="#12381B">${title}</text>
+      <text x="${width - 30}" y="65" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#5B6F60">${subtitle}</text>
+      ${rows}
+    </svg>
+  `;
+}
+
+function getChartDataUrl(analytics) {
+  const svg = getChartSvg(analytics);
+  return svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : '';
+}
+
+function buildRankTable(analytics) {
+  const items = analytics.chartData.slice(0, 10);
+  if (!items.length) {
+    return '<div class="chart-empty">אין עדיין נתונים להצגה בטווח שנבחר.</div>';
+  }
+
+  return items.map((item, index) => `
+    <div class="analytics-row">
+      <div class="analytics-rank">${index + 1}</div>
+      <div>
+        <div class="analytics-name">${escapeHtml(item.name)}</div>
+        <span class="analytics-subtext">${formatGroupLabel(analytics.groupBy)} • ${formatPeriodLabel(analytics.period)}</span>
+      </div>
+      <div class="analytics-value">${formatNumber(item.quantity)}</div>
+    </div>
+  `).join('');
+}
+
+function renderStatisticsView() {
+  const analytics = getAnalyticsData(statisticsState.period, statisticsState.groupBy);
+  const periodFilters = document.getElementById('periodFilters');
+  const groupFilters = document.getElementById('groupFilters');
+  const analyticsCards = document.getElementById('analyticsCards');
+  const analyticsTitle = document.getElementById('analyticsTitle');
+  const analyticsSubtitle = document.getElementById('analyticsSubtitle');
+  const analyticsBadge = document.getElementById('analyticsBadge');
+  const analyticsChart = document.getElementById('analyticsChart');
+  const analyticsTable = document.getElementById('analyticsTable');
+  const analyticsRecordsCount = document.getElementById('analyticsRecordsCount');
+
+  if (!periodFilters || !groupFilters || !analyticsCards || !analyticsTitle || !analyticsSubtitle || !analyticsBadge || !analyticsChart || !analyticsTable || !analyticsRecordsCount) {
+    return;
+  }
+
+  periodFilters.innerHTML = PERIOD_OPTIONS.map(item => `
+    <button class="filter-chip ${item.key === statisticsState.period ? 'active' : ''}" onclick="setStatisticsPeriod('${item.key}')">${item.label}</button>
+  `).join('');
+
+  groupFilters.innerHTML = GROUP_OPTIONS.map(item => `
+    <button class="filter-chip ${item.key === statisticsState.groupBy ? 'active' : ''}" onclick="setStatisticsGroup('${item.key}')">${item.icon} ${item.label}</button>
+  `).join('');
+
+  analyticsCards.innerHTML = `
+    <div class="stat-card"><div class="stat-value">${formatNumber(analytics.totalQty)}</div><div class="stat-label">סה"כ עופות</div></div>
+    <div class="stat-card"><div class="stat-value">${analytics.totalShipments}</div><div class="stat-label">משלוחים בטווח</div></div>
+    <div class="stat-card"><div class="stat-value">${formatNumber(analytics.averageQty)}</div><div class="stat-label">ממוצע למשלוח</div></div>
+    <div class="stat-card"><div class="stat-value">${analytics.topItem ? formatNumber(analytics.topItem.quantity) : '0'}</div><div class="stat-label">${analytics.topItem ? `שיא - ${escapeHtml(truncateLabel(analytics.topItem.name, 14))}` : 'אין מוביל עדיין'}</div></div>
+    <div class="stat-card"><div class="stat-value">${analytics.uniqueFarms}</div><div class="stat-label">חוות פעילות</div></div>
+    <div class="stat-card"><div class="stat-value">${analytics.uniqueSlaughterhouses}</div><div class="stat-label">משחטות פעילות</div></div>
+  `;
+
+  analyticsRecordsCount.innerText = String(analytics.totalShipments);
+  analyticsTitle.innerText = `גרף ${formatGroupLabel(analytics.groupBy)}`;
+  analyticsSubtitle.innerText = `${formatPeriodLabel(analytics.period)} • השוואה בין ${formatGroupLabel(analytics.groupBy)} על בסיס כל הנתונים בטווח שנבחר`;
+  analyticsBadge.innerText = analytics.topItem ? `מוביל: ${truncateLabel(analytics.topItem.name, 16)}` : 'ללא נתונים';
+  analyticsChart.innerHTML = analytics.chartData.length
+    ? `<img class="analytics-chart-image" src="${getChartDataUrl(analytics)}" alt="Analytics chart">`
+    : '<div class="chart-empty">אין נתונים בטווח שנבחר.<br>הוסף שיווקים או משוך אותם מהענן כדי לראות גרף.</div>';
+  analyticsTable.innerHTML = buildRankTable(analytics);
+}
+
+function renderReportsView() {
+  const container = document.getElementById('reportsContext');
+  if (!container) return;
+
+  const analytics = getDailyReportAnalytics();
+
+  if (!analytics.records.length) {
+    container.innerHTML = `
+      <div class="report-context-card">
+        <h3>הדוח היומי מוכן, אבל עדיין אין נתונים להיום</h3>
+        <p>לא נמצאו רשומות עבור היום. לאחר הוספת נתונים, יופק דוח תפעולי יומי הכולל פילוח משחטות.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const tags = [
+    `דוח יומי: ${formatIsoDateDisplay(getSafeIsoDate())}`,
+    `פילוח: משחטות וחוות`,
+    `סה"כ: ${formatNumber(analytics.totalQty)}`,
+    `משלוחים: ${analytics.totalShipments}`,
+    analytics.topItem ? `מוביל: ${truncateLabel(analytics.topItem.name, 18)}` : 'מוביל: אין'
+  ].map(text => `<span class="report-tag">${escapeHtml(text)}</span>`).join('');
+
+  container.innerHTML = `
+    <div class="report-context-card">
+      <h3>הדוח מופק על בסיס נתוני היום בלבד</h3>
+      <p>כאן מופקים מסמכים תפעוליים לשיתוף מהיר. דוחות עומק אנליטיים נשארים בלשונית הסטטיסטיקה.</p>
+      <div class="report-tags">${tags}</div>
+    </div>
+  `;
+}
+
+function render() {
+  try {
+    const todayStr = getSafeIsoDate();
+    const filteredRecords = getFilteredSearchRecords();
+    const normalizedRecords = filteredRecords.map(normalizeRecord).filter(item => item.parsedDate);
+    const todayList = normalizedRecords.filter(item => getDateKey(item.parsedDate) === todayStr);
+    const historyList = normalizedRecords.filter(item => getDateKey(item.parsedDate) !== todayStr);
+    const homeAnalytics = getAnalyticsData('day', 'slaughterhouse', filteredRecords);
+    const tags = homeAnalytics.chartData.map(item => `<div class="stat-tag">🏭 ${escapeHtml(item.name)}: ${formatNumber(item.quantity)}</div>`).join('');
+
+    document.getElementById('statsSection').innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">${formatNumber(homeAnalytics.totalQty)}</div><div class="stat-label">🐔 סה"כ היום</div></div>
+        <div class="stat-card"><div class="stat-value">${todayList.length}</div><div class="stat-label">📋 משלוחים</div></div>
+        <div class="stat-card wide">
+          <div class="stat-label" style="margin-bottom:5px">📍 ריכוז לפי משחטה (היום):</div>
+          <div class="stat-breakdown">${tags || '<span style="color:gray;font-size:11px">אין נתונים היום</span>'}</div>
+        </div>
+      </div>
+    `;
+
+    const mapRec = (item, isEditable) => `
+      <div class="record-card ${item.status === 'sent' ? 'status-sent' : ''}">
+        <div class="record-header">
+          <b>${escapeHtml(item.farm || 'ללא שם')}</b>
+          <span class="record-status ${item.status === 'sent' ? 'sent' : 'pending'}">${item.status === 'sent' ? 'סונכרן' : 'ממתין'}</span>
+        </div>
+        <div style="margin:5px 0">כמות: <b>${formatNumber(item.quantity)}</b> | משחטה: ${escapeHtml(item.slaughterhouse || 'כללי')}</div>
+        <div style="font-size:11px; color:gray">📅 ${formatDateHe(item.datetime)}</div>
+        ${item.notes ? `<div style="font-size:11px; color:var(--text-secondary); margin-top:6px;">📝 ${escapeHtml(item.notes)}</div>` : ''}
+        ${isEditable
+          ? `<div style="display:flex; gap:10px; margin-top:10px;"><button class="rec-btn" onclick="editRecord('${item.id}')">✏️ ערוך</button><button class="rec-btn" style="color:red" onclick="deleteRecord('${item.id}')">🗑️ מחק</button></div>`
+          : `<div style="margin-top:12px; padding-top:10px; border-top:1px dashed #eee; font-size:11px; color:#999; font-weight:bold; text-align:center;">🔒 רשומה נעולה (היסטוריה)</div>`
+        }
+      </div>
+    `;
+
+    const historyFiltered = historyList.filter(item => !activeKashrutFilter || item.kashrut === activeKashrutFilter);
+    document.getElementById('recordsList').innerHTML = todayList.map(item => mapRec(item, true)).join('') || '<p style="text-align:center; padding:20px; color:gray;">אין שיווקים להיום</p>';
+    document.getElementById('historyList').innerHTML = historyFiltered.map(item => mapRec(item, false)).join('') || '<p style="text-align:center; padding:20px; color:gray;">אין נתונים לסינון זה</p>';
+    renderStatisticsView();
+    renderReportsView();
+    if (document.getElementById('derishotGrid')) renderDerishotGrid();
+  } catch (e) {
+    console.error('Render error', e);
+  }
+}
+
+async function pullFromCloud() {
+  try {
+    toast('⏳ מוריד נתונים מהענן...');
+    const url = (document.getElementById('gsUrl')?.value || settings.gsUrl || MASTER_URL);
+    if (!url) return alert('חסר קישור לסנכרון');
+
+    // Pull שיווקים — try with type param first, fallback to plain URL
+    let cloudData = null;
+    try {
+      const res1 = await fetch(url + '?type=shivukim');
+      const data1 = await res1.json();
+      if (Array.isArray(data1)) cloudData = data1;
+    } catch(e1) {}
+
+    // Fallback: plain URL (old script format)
+    if (!cloudData) {
+      try {
+        const res2 = await fetch(url);
+        const data2 = await res2.json();
+        if (Array.isArray(data2)) cloudData = data2;
+      } catch(e2) {}
+    }
+
+    if (cloudData && Array.isArray(cloudData)) {
+      const cloudIds = new Set(cloudData.map(r => r.id));
+      const localPending = records.filter(r => r.status === 'pending' && !cloudIds.has(r.id));
+      records = [...cloudData, ...localPending];
+      localStorage.setItem('poultry_manager_data', JSON.stringify(records));
+      render();
+      toast(`✅ סונכרן — ${cloudData.length} רשומות`);
+    } else {
+      toast('❌ לא התקבלו נתונים מהענן — בדוק את הקישור בהגדרות');
+      return;
+    }
+
+    // Pull דרישות (only if new script installed)
+    try {
+      const resD = await fetch(url + '?type=derishott');
+      const cloudDerishott = await resD.json();
+      if (cloudDerishott && typeof cloudDerishott === 'object' && !Array.isArray(cloudDerishott) && !cloudDerishott.error) {
+        const merged = { ...getDerishott(), ...cloudDerishott };
+        saveDerishotStorage(merged);
+      }
+    } catch(e3) {}
+
+    // Pull תוכנית (only if new script installed)
+    try {
+      const resT = await fetch(url + '?type=tochnit');
+      const cloudTochnit = await resT.json();
+      if (cloudTochnit && typeof cloudTochnit === 'object' && !Array.isArray(cloudTochnit) && !cloudTochnit.error) {
+        const local = getPlan();
+        Object.entries(cloudTochnit).forEach(([date, slaughters]) => {
+          if (!local[date]) local[date] = {};
+          Object.assign(local[date], slaughters);
+        });
+        savePlan(local);
+      }
+    } catch(e4) {}
+
+    if (document.getElementById('derishotGrid')) renderDerishotGrid();
+    if (document.getElementById('planDailyGrid')) renderPlanView();
+  } catch (e) {
+    alert('שגיאה במשיכת נתונים מהענן:\n' + e.message);
+  }
+}
+
+async function sync(record, action) {
+  const url = document.getElementById('gsUrl')?.value || settings.gsUrl || MASTER_URL;
+  if (!url) return false;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ ...record, type: 'shivukim', action: action || 'upsert' })
+    });
+    return true;
+  } catch(e) {
+    console.warn('Sync failed:', e);
+    return false;
+  }
+}
+
+async function saveRecord() {
+  try {
+    const farm = getFarmValue();
+    const qty = document.getElementById('fQty').value;
+    if (!farm || !qty) {
+      alert('נא למלא חווה וכמות');
+      return;
+    }
+    const slaughterhouse = getSlaughterValue();
+    if (!slaughterhouse) {
+      alert('נא לבחור משחטה או להזין משחטה ידנית');
+      return;
+    }
+    rememberFarm(farm);
+    rememberSlaughterhouse(slaughterhouse);
+
+    const data = {
+      id: editingId || Date.now().toString(36),
+      datetime: document.getElementById('fDate').value || new Date().toISOString(),
+      farm: farm,
+      quantity: Number(qty),
+      slaughterhouse: slaughterhouse,
+      kashrut: document.getElementById('fKashrut').value || 'רגיל',
+      notes: document.getElementById('fNotes').value || '',
+      status: 'pending'
+    };
+
+    if (editingId) {
+      const idx = records.findIndex(item => item.id === editingId);
+      if (idx !== -1) records[idx] = data;
+    } else {
+      records.unshift(data);
+    }
+
+    localStorage.setItem('poultry_manager_data', JSON.stringify(records));
+    closeModal();
+    render();
+    toast('🔄 מסנכרן לטבלה...');
+
+    const ok = await sync(data, 'upsert');
+    if (ok) {
+      const idx = records.findIndex(item => item.id === data.id);
+      if (idx !== -1) records[idx].status = 'sent';
+      localStorage.setItem('poultry_manager_data', JSON.stringify(records));
+      render();
+      toast('✅ סונכרן בהצלחה');
+    }
+  } catch (e) {
+    alert('שגיאה בשמירת הנתונים: ' + e.message);
+  }
+}
+
+async function deleteRecord(id) {
+  try {
+    if (!confirm('למחוק מהטבלה ומכאן?')) return;
+    const found = records.find(item => item.id === id);
+    records = records.filter(item => item.id !== id);
+    localStorage.setItem('poultry_manager_data', JSON.stringify(records));
+    render();
+    if (found) {
+      toast('🗑️ מוחק מהענן...');
+      const ok = await sync(found, 'delete');
+      toast(ok ? '✅ נמחק בהצלחה' : '⚠️ נמחק מקומית, לא הצליח במחיקה מהענן');
+    }
+  } catch (e) {
+    alert('שגיאה במחיקה: ' + e.message);
+  }
+}
+
+function openModal() {
+  try {
+    editingId = null;
+    const now = new Date();
+    document.getElementById('formTitle').innerText = 'פרטי שיווק';
+    document.getElementById('fDate').value = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    document.getElementById('fFarm').value = '';
+    hideFarmSuggestions();
+    document.getElementById('fQty').value = '';
+    populateSlaughterSelect('');
+    document.getElementById('fSlaughterSelect').value = '';
+    document.getElementById('fSlaughter').value = '';
+    document.getElementById('fSlaughter').style.display = 'none';
+    document.getElementById('fKashrut').value = '';
+    document.getElementById('fNotes').value = '';
+    document.getElementById('modal').style.display = 'flex';
+    renderTemplateChips();
+  } catch (e) {}
+}
+
+function closeModal() {
+  document.getElementById('modal').style.display = 'none';
+}
+
+function editRecord(id) {
+  try {
+    const found = records.find(item => item.id === id);
+    if (!found) return;
+    editingId = found.id;
+    document.getElementById('formTitle').innerText = 'עריכת שיווק';
+    const dt = found.datetime ? found.datetime.slice(0, 16) : '';
+    document.getElementById('fDate').value = dt;
+    document.getElementById('fFarm').value = found.farm || '';
+    hideFarmSuggestions();
+    document.getElementById('fQty').value = found.quantity;
+    const slaughterVal = found.slaughterhouse || '';
+    populateSlaughterSelect(slaughterVal);
+    const knownSlaughters = [...getAllSlaughterhouses(), ''];
+    const sel = document.getElementById('fSlaughterSelect');
+    if (knownSlaughters.includes(slaughterVal)) {
+      sel.value = slaughterVal;
+      document.getElementById('fSlaughter').style.display = 'none';
+      document.getElementById('fSlaughter').value = '';
+    } else {
+      sel.value = '__other__';
+      document.getElementById('fSlaughter').style.display = 'block';
+      document.getElementById('fSlaughter').value = slaughterVal;
+    }
+    document.getElementById('fKashrut').value = found.kashrut;
+    document.getElementById('fNotes').value = found.notes;
+    document.getElementById('modal').style.display = 'flex';
+  } catch (e) {}
+}
+
+function setStatisticsPeriod(period) {
+  statisticsState.period = period;
+  renderStatisticsView();
+  renderReportsView();
+}
+
+function setStatisticsGroup(groupBy) {
+  statisticsState.groupBy = groupBy;
+  renderStatisticsView();
+  renderReportsView();
+}
+
+function switchTab(tabName) {
+  try {
+    currentTab = tabName;
+    TAB_NAMES.forEach(view => {
+      const viewNode = document.getElementById(view + 'View');
+      const navNode = document.getElementById('nav' + view.charAt(0).toUpperCase() + view.slice(1));
+      if (viewNode) viewNode.style.display = view === tabName ? 'block' : 'none';
+      if (navNode) navNode.classList.toggle('active', view === tabName);
+    });
+    const searchBar = document.getElementById('searchBar');
+    if (searchBar) searchBar.style.display = (tabName === 'home' || tabName === 'history') ? 'block' : 'none';
+    if (tabName === 'plan') { renderPlanView(); renderDerishotGrid(); }
+  } catch (e) {}
+}
+
+function getExportFilename(extension) {
+  return `Poultry_${statisticsState.period}_${statisticsState.groupBy}_${getSafeIsoDate()}.${extension}`;
+}
+
+function downloadBlob(blob, filename) {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(link.href);
+    document.body.removeChild(link);
+  }, 0);
+}
+
+async function svgToPngDataUrl(svgText) {
+  try {
+    if (!svgText) return null;
+    const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    const loaded = await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = url;
+    });
+    if (!loaded && !img.width) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(img.width, 760);
+    canvas.height = Math.max(img.height, 320);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    return canvas.toDataURL('image/png');
+  } catch (e) {
+    return null;
+  }
+}
+
+function styleHeaderRow(row) {
+  row.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+  row.alignment = { horizontal: 'center', vertical: 'middle' };
+  row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+  row.eachCell(cell => {
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFB0BEC5' } },
+      left: { style: 'thin', color: { argb: 'FFB0BEC5' } },
+      bottom: { style: 'thin', color: { argb: 'FFB0BEC5' } },
+      right: { style: 'thin', color: { argb: 'FFB0BEC5' } }
+    };
+  });
+}
+
+// ===============================================
+// ROUTER FUNCTIONS: Decide which report to run
+// ===============================================
+
+async function exportExcel() {
+  if (currentTab === 'reports') {
+    return exportDailyExcel();
+  }
+  return exportAnalyticsExcel();
+}
+
+async function exportPDF() {
+  if (currentTab === 'reports') {
+    return exportDailyPDF();
+  }
+  return exportAnalyticsPDF();
+}
+
+function sendWhatsApp() {
+  if (currentTab === 'reports') {
+    return sendDailyWhatsApp();
+  }
+  return sendAnalyticsWhatsApp();
+}
+
+
+// ===============================================
+// ANALYTICS REPORTS (STATISTICS TAB)
+// ===============================================
+
+async function exportAnalyticsExcel() {
+  try {
+    const analytics = getAnalyticsData(statisticsState.period, statisticsState.groupBy);
+    if (!analytics.records.length) {
+      toast('⚠️ אין נתונים לייצוא');
+      return;
+    }
+
+    const dayStats = getAnalyticsData('day', statisticsState.groupBy);
+    const weekStats = getAnalyticsData('week', statisticsState.groupBy);
+    const monthStats = getAnalyticsData('month', statisticsState.groupBy);
+    const yearStats = getAnalyticsData('year', statisticsState.groupBy);
+
+    // Вычисляем точные даты начала и конца для заголовков
+    const startDateStr = analytics.range.start.toLocaleDateString('he-IL');
+    // Отнимаем 1 миллисекунду от endExclusive, чтобы получить конец предыдущего дня
+    const endDateStr = new Date(analytics.range.endExclusive.getTime() - 1).toLocaleDateString('he-IL');
+    const dateRangeLabel = `${startDateStr} עד ${endDateStr}`;
+
+    if (window.ExcelJS && window.ExcelJS.Workbook) {
+      const workbook = new window.ExcelJS.Workbook();
+      workbook.creator = 'PoultryManager PRO';
+      workbook.created = new Date();
+      workbook.modified = new Date();
+      workbook.calcProperties.fullCalcOnLoad = true;
+
+      const summary = workbook.addWorksheet('סיכום', { views: [{ rightToLeft: true, showGridLines: false }] });
+      const details = workbook.addWorksheet('נתונים', { views: [{ rightToLeft: true, state: 'frozen', ySplit: 4 }] });
+
+      [summary, details].forEach(sheet => {
+        sheet.pageSetup = {
+          orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+          margins: { left: 0.3, right: 0.3, top: 0.45, bottom: 0.45, header: 0.2, footer: 0.2 }
+        };
+      });
+
+      summary.columns = [
+        { width: 26 }, { width: 16 }, { width: 14 }, { width: 4 },
+        { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }
+      ];
+
+      // Главный заголовок
+      summary.mergeCells('A1:H1');
+      summary.getCell('A1').value = 'לוח תיפולי יסכה רפאל - דוח סטטיסטי מקצועי';
+      summary.getCell('A1').font = { size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
+      summary.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+      summary.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+      summary.getRow(1).height = 32;
+
+      // Подзаголовок с точными датами
+      summary.mergeCells('A2:H2');
+      summary.getCell('A2').value = `תקופה: ${formatPeriodLabel(analytics.period)} (${dateRangeLabel}) | הופק: ${new Date().toLocaleString('he-IL')}`;
+      summary.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+      summary.getCell('A2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+      summary.getCell('A2').font = { bold: true, color: { argb: 'FF23442B' }, size: 12 };
+      summary.getRow(2).height = 25;
+
+      // Глобальная статистика
+      summary.mergeCells('A4:H4');
+      summary.getCell('A4').value = `סיכום כמויות 📊 | היום: ${formatNumber(dayStats.totalQty)} | השבוע: ${formatNumber(weekStats.totalQty)} | החודש: ${formatNumber(monthStats.totalQty)} | השנה: ${formatNumber(yearStats.totalQty)} עופות`;
+      summary.getCell('A4').font = { bold: true, color: { argb: 'FF1B5E20' }, size: 13 };
+      summary.getCell('A4').alignment = { horizontal: 'center', vertical: 'middle' };
+      summary.getCell('A4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC8E6C9' } };
+      summary.getRow(4).height = 28;
+
+      // Блок KPI
+      summary.getRow(6).values = ['', '', '', '', 'סה"כ עופות', 'משלוחים', 'ממוצע למשלוח', 'שיא כמות'];
+      summary.getRow(7).values = ['', '', '', '', analytics.totalQty, analytics.totalShipments, analytics.averageQty, analytics.topItem ? analytics.topItem.quantity : 0];
+      
+      summary.getRow(6).eachCell((cell, colNum) => {
+        if(colNum >= 5) {
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+          cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        }
+      });
+      summary.getRow(7).eachCell((cell, colNum) => {
+        if(colNum >= 5) {
+          cell.font = { bold: true, size: 14, color: { argb: 'FF212121' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+          if(typeof cell.value === 'number') cell.numFmt = '#,##0';
+        }
+      });
+      summary.getRow(7).height = 30;
+
+      // --- Готовим данные для двух пилуахов ---
+      const farmMap = {};
+      const slaughterMap = {};
+      analytics.records.forEach(r => {
+        const f = r.farm || 'לא צוין';
+        const s = r.slaughterhouse || 'כללי';
+        farmMap[f] = (farmMap[f] || 0) + r.quantity;
+        slaughterMap[s] = (slaughterMap[s] || 0) + r.quantity;
+      });
+      
+      const farmData = Object.keys(farmMap).map(name => ({name, quantity: farmMap[name]})).sort((a,b) => b.quantity - a.quantity);
+      const slaughterData = Object.keys(slaughterMap).map(name => ({name, quantity: slaughterMap[name]})).sort((a,b) => b.quantity - a.quantity);
+
+      let currentRow = 9;
+
+      // 1. Пилуах по фермам
+      summary.mergeCells(`A${currentRow}:C${currentRow}`);
+      summary.getCell(`A${currentRow}`).value = `פילוח לפי חוות`;
+      summary.getCell(`A${currentRow}`).font = { size: 14, bold: true, color: { argb: 'FF1B5E20' } };
+      summary.getCell(`A${currentRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F8F2' } };
+      currentRow++;
+
+      summary.getRow(currentRow).values = ['שם חווה', 'כמות', 'אחוז'];
+      styleHeaderRow(summary.getRow(currentRow));
+      currentRow++;
+
+      farmData.forEach(item => {
+        const row = summary.getRow(currentRow);
+        row.values = [item.name, item.quantity, analytics.totalQty ? item.quantity / analytics.totalQty : 0];
+        row.getCell(2).numFmt = '#,##0';
+        row.getCell(3).numFmt = '0.0%';
+        row.eachCell((cell, col) => {
+          if (col <= 3) {
+            cell.border = { top: { style: 'thin', color:{argb:'FFCFD8DC'} }, left: { style: 'thin', color:{argb:'FFCFD8DC'} }, bottom: { style: 'thin', color:{argb:'FFCFD8DC'} }, right: { style: 'thin', color:{argb:'FFCFD8DC'} } };
+            if (col > 1) cell.alignment = { horizontal: 'center' };
+          }
+        });
+        currentRow++;
+      });
+
+      currentRow += 1; // Пустая строка между таблицами
+
+      // 2. Пилуах по бойням
+      summary.mergeCells(`A${currentRow}:C${currentRow}`);
+      summary.getCell(`A${currentRow}`).value = `פילוח לפי משחטות`;
+      summary.getCell(`A${currentRow}`).font = { size: 14, bold: true, color: { argb: 'FF1B5E20' } };
+      summary.getCell(`A${currentRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F8F2' } };
+      currentRow++;
+
+      summary.getRow(currentRow).values = ['שם משחטה', 'כמות', 'אחוז'];
+      styleHeaderRow(summary.getRow(currentRow));
+      currentRow++;
+
+      slaughterData.forEach(item => {
+        const row = summary.getRow(currentRow);
+        row.values = [item.name, item.quantity, analytics.totalQty ? item.quantity / analytics.totalQty : 0];
+        row.getCell(2).numFmt = '#,##0';
+        row.getCell(3).numFmt = '0.0%';
+        row.eachCell((cell, col) => {
+          if (col <= 3) {
+            cell.border = { top: { style: 'thin', color:{argb:'FFCFD8DC'} }, left: { style: 'thin', color:{argb:'FFCFD8DC'} }, bottom: { style: 'thin', color:{argb:'FFCFD8DC'} }, right: { style: 'thin', color:{argb:'FFCFD8DC'} } };
+            if (col > 1) cell.alignment = { horizontal: 'center' };
+          }
+        });
+        currentRow++;
+      });
+
+      // Вставка графика СБОКУ (Колонка E, Строка 9)
+      const chartPng = await svgToPngDataUrl(getChartSvg(analytics));
+      if (chartPng) {
+        const imageId = workbook.addImage({ base64: chartPng, extension: 'png' });
+        summary.addImage(imageId, {
+          tl: { col: 4, row: 8.5 },
+          ext: { width: 500, height: 320 }
+        });
+      }
+
+      // --- ВТОРОЙ ЛИСТ: Подробные данные с колонками День/Месяц/Год ---
+      details.columns = [
+        { key: 'date', width: 14 }, { key: 'time', width: 12 }, 
+        { key: 'day', width: 10 }, { key: 'month', width: 10 }, { key: 'year', width: 10 }, // Новые колонки
+        { key: 'farm', width: 26 }, { key: 'quantity', width: 16 }, 
+        { key: 'slaughterhouse', width: 22 }, { key: 'kashrut', width: 16 }, { key: 'notes', width: 34 }
+      ];
+      
+      details.mergeCells('A1:J1');
+      details.getCell('A1').value = `דוח נתונים מלא - טווח: ${dateRangeLabel}`;
+      details.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+      details.getCell('A1').alignment = { horizontal: 'center' };
+      details.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+      
+      details.mergeCells('A2:J2');
+      details.getCell('A2').value = `ניתן לסנן ולמיין את הנתונים לפי יום, חודש ושנה באמצעות החצים בשורת הכותרת`;
+      details.getCell('A2').alignment = { horizontal: 'center' };
+      details.getCell('A2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+      
+      details.getRow(4).values = ['תאריך', 'שעה', 'יום', 'חודש', 'שנה', 'שם החווה', 'כמות עופות', 'משחטה', 'סוג כשרות', 'הערות'];
+      styleHeaderRow(details.getRow(4));
+
+      analytics.records.forEach((item, index) => {
+        const d = item.parsedDate;
+        const row = details.getRow(5 + index);
+        row.values = [
+          d ? d.toLocaleDateString('he-IL') : '',
+          d ? d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '',
+          d ? d.getDate() : '',        // День
+          d ? d.getMonth() + 1 : '',   // Месяц
+          d ? d.getFullYear() : '',    // Год
+          item.farm, item.quantity, item.slaughterhouse, item.kashrut, item.notes
+        ];
+        row.getCell(7).numFmt = '#,##0'; // Колонка с количеством (G)
+        row.eachCell(cell => {
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.border = { top: { style: 'thin', color: { argb: 'FFD6E2D9' } }, left: { style: 'thin', color: { argb: 'FFD6E2D9' } }, bottom: { style: 'thin', color: { argb: 'FFD6E2D9' } }, right: { style: 'thin', color: { argb: 'FFD6E2D9' } } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: index % 2 === 0 ? 'FFF9FCF9' : 'FFFFFFFF' } };
+        });
+      });
+
+      // Включаем фильтры от колонки 1 (A) до 10 (J)
+      details.autoFilter = { from: { row: 4, column: 1 }, to: { row: Math.max(4, analytics.records.length + 4), column: 10 } };
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      downloadBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), getExportFilename('xlsx'));
+      toast('💾 דוח Excel מקצועי נוצר בהצלחה');
+      return;
+    }
+
+    // Резервный вариант, если ExcelJS не загрузится
+    const wb = XLSX.utils.book_new();
+    const wsData = [];
+    wsData.push([`לוח תיפולי יסכה רפאל - טווח: ${dateRangeLabel}`]);
+    wsData.push([`תקופה: ${formatPeriodLabel(analytics.period)}`]);
+    wsData.push([]);
+    wsData.push(['תאריך', 'שעה', 'יום', 'חודש', 'שנה', 'שם החווה', 'כמות עופות', 'משחטה', 'סוג כשרות', 'הערות']);
+    analytics.records.forEach(item => {
+      const d = item.parsedDate;
+      wsData.push([
+        d ? d.toLocaleDateString('he-IL') : '',
+        d ? d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '',
+        d ? d.getDate() : '', d ? d.getMonth() + 1 : '', d ? d.getFullYear() : '',
+        item.farm, item.quantity, item.slaughterhouse, item.kashrut, item.notes
+      ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 22 }, { wch: 15 }, { wch: 18 }, { wch: 16 }, { wch: 30 }];
+    ws['!autofilter'] = { ref: `A4:J${Math.max(4, analytics.records.length + 4)}` };
+    XLSX.utils.book_append_sheet(wb, ws, 'דוח');
+    XLSX.writeFile(wb, getExportFilename('xlsx'));
+    toast('💾 דוח Excel נוצר בהצלחה');
+  } catch (e) {
+    alert('שגיאה ביצירת קובץ Excel: ' + e.message);
+  }
+}
+
+async function exportAnalyticsPDF() {
+  try {
+    const analytics = getAnalyticsData(statisticsState.period, statisticsState.groupBy);
+    if (!analytics.records.length) {
+      toast('⚠️ אין נתונים לייצוא');
+      return;
+    }
+
+    const chartUrl = getChartDataUrl(analytics);
+    const topRows = analytics.chartData.slice(0, 8).map((item, index) => `
+      <tr>
+        <td style="padding:9px; border:1px solid #D7E4D9; text-align:center;">${index + 1}</td>
+        <td style="padding:9px; border:1px solid #D7E4D9;">${escapeHtml(item.name)}</td>
+        <td style="padding:9px; border:1px solid #D7E4D9; text-align:center;" dir="ltr">${formatNumber(item.quantity)}</td>
+      </tr>
+    `).join('');
+
+    const detailRows = analytics.records.slice(0, 18).map((item, index) => `
+      <tr style="background:${index % 2 === 0 ? '#F8FBF8' : '#FFFFFF'};">
+        <td style="padding:8px; border:1px solid #D7E4D9;" dir="ltr">${item.parsedDate ? item.parsedDate.toLocaleDateString('he-IL') : ''}</td>
+        <td style="padding:8px; border:1px solid #D7E4D9;" dir="ltr">${item.parsedDate ? item.parsedDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : ''}</td>
+        <td style="padding:8px; border:1px solid #D7E4D9;">${escapeHtml(item.farm)}</td>
+        <td style="padding:8px; border:1px solid #D7E4D9;" dir="ltr">${formatNumber(item.quantity)}</td>
+        <td style="padding:8px; border:1px solid #D7E4D9;">${escapeHtml(item.slaughterhouse)}</td>
+        <td style="padding:8px; border:1px solid #D7E4D9;">${escapeHtml(item.kashrut)}</td>
+      </tr>
+    `).join('');
+
+    const el = document.createElement('div');
+    el.style.padding = '26px';
+    el.style.direction = 'rtl';
+    el.style.fontFamily = 'Arial, sans-serif';
+    el.style.background = '#FFFFFF';
+    el.style.color = '#17341C';
+    el.innerHTML = `
+      <div style="border-bottom:4px solid #1B5E20; padding-bottom:16px; margin-bottom:18px; display:flex; justify-content:space-between; gap:20px; align-items:flex-start;">
+        <div>
+          <img src="${LOGO_DATA_URL}" alt="לוגו" style="height:52px; width:auto; object-fit:contain; margin-bottom:8px; display:block;">
+          <h1 style="margin:0; font-size:27px; color:#1B5E20;">דוח&nbsp;סטטיסטי&nbsp;מקצועי</h1>
+          <p style="margin:10px 0 0; font-size:13px; color:#4F6E54;">תקופה:&nbsp;${formatPeriodLabel(analytics.period)}&nbsp;|&nbsp;פילוח:&nbsp;${formatGroupLabel(analytics.groupBy)}</p>
+        </div>
+        <div style="background:#E8F5E9; border:1px solid #C8E6C9; border-radius:14px; padding:12px 16px; min-width:170px;">
+          <div style="font-size:12px; color:#4F6E54; margin-bottom:4px;">תאריך&nbsp;הפקה</div>
+          <div style="font-weight:800; font-size:15px;" dir="ltr">${new Date().toLocaleString('he-IL')}</div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:18px;">
+        <div style="background:#F5FBF5; border:1px solid #D7E4D9; border-radius:16px; padding:14px; text-align:center;"><div style="font-size:24px; font-weight:800; color:#1B5E20;" dir="ltr">${formatNumber(analytics.totalQty)}</div><div style="font-size:12px; color:#5C6C60;">סה"כ&nbsp;עופות</div></div>
+        <div style="background:#F5FBF5; border:1px solid #D7E4D9; border-radius:16px; padding:14px; text-align:center;"><div style="font-size:24px; font-weight:800; color:#1B5E20;" dir="ltr">${analytics.totalShipments}</div><div style="font-size:12px; color:#5C6C60;">משלוחים</div></div>
+        <div style="background:#F5FBF5; border:1px solid #D7E4D9; border-radius:16px; padding:14px; text-align:center;"><div style="font-size:24px; font-weight:800; color:#1B5E20;" dir="ltr">${formatNumber(analytics.averageQty)}</div><div style="font-size:12px; color:#5C6C60;">ממוצע&nbsp;למשלוח</div></div>
+        <div style="background:#F5FBF5; border:1px solid #D7E4D9; border-radius:16px; padding:14px; text-align:center;"><div style="font-size:18px; font-weight:800; color:#1B5E20;">${analytics.topItem ? escapeHtml(truncateLabel(analytics.topItem.name, 18)) : 'אין'}</div><div style="font-size:12px; color:#5C6C60;">מוביל&nbsp;בטווח</div></div>
+      </div>
+
+      <div style="background:#F8FBF8; border:1px solid #D7E4D9; border-radius:18px; padding:16px; margin-bottom:18px;">
+        <div style="font-size:18px; font-weight:800; margin-bottom:10px; color:#1B5E20;">גרף&nbsp;השוואתי</div>
+        ${chartUrl ? `<img src="${chartUrl}" alt="Analytics chart" style="width:100%; border-radius:14px; display:block;">` : '<div style="padding:30px; text-align:center; color:#5C6C60;">אין גרף להצגה</div>'}
+      </div>
+
+      <div style="display:flex; gap:14px; margin-bottom:18px;">
+        <div style="flex:1; background:#FFFFFF; border:1px solid #D7E4D9; border-radius:18px; padding:16px;">
+          <div style="font-size:18px; font-weight:800; margin-bottom:10px; color:#1B5E20;">דירוג&nbsp;מובילים</div>
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#1B5E20; color:#FFFFFF;">
+                <th style="padding:9px; border:1px solid #D7E4D9;">#</th>
+                <th style="padding:9px; border:1px solid #D7E4D9;">קטגוריה</th>
+                <th style="padding:9px; border:1px solid #D7E4D9;">כמות</th>
+              </tr>
+            </thead>
+            <tbody>${topRows || '<tr><td colspan="3" style="padding:12px; text-align:center;">אין נתונים</td></tr>'}</tbody>
+          </table>
+        </div>
+        <div style="width:240px; background:#E8F5E9; border:1px solid #C8E6C9; border-radius:18px; padding:16px;">
+          <div style="font-size:18px; font-weight:800; color:#1B5E20; margin-bottom:12px;">תמונת&nbsp;מצב</div>
+          <div style="font-size:13px; color:#4F6E54; line-height:1.9;">
+            חוות פעילות: <b>${analytics.uniqueFarms}</b><br>
+            משחטות פעילות: <b>${analytics.uniqueSlaughterhouses}</b><br>
+            ימי פעילות: <b>${analytics.activeDays}</b><br>
+            סוג דוח: <b>${formatPeriodLabel(analytics.period)}</b>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #D7E4D9; border-radius:18px; overflow:hidden;">
+        <div style="background:#1B5E20; color:#FFFFFF; padding:12px 16px; font-size:18px; font-weight:800;">דוגמא&nbsp;מטבלת&nbsp;הנתונים</div>
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead>
+            <tr style="background:#E8F5E9; color:#17341C;">
+              <th style="padding:9px; border:1px solid #D7E4D9;">תאריך</th>
+              <th style="padding:9px; border:1px solid #D7E4D9;">שעה</th>
+              <th style="padding:9px; border:1px solid #D7E4D9;">חווה</th>
+              <th style="padding:9px; border:1px solid #D7E4D9;">כמות</th>
+              <th style="padding:9px; border:1px solid #D7E4D9;">משחטה</th>
+              <th style="padding:9px; border:1px solid #D7E4D9;">כשרות</th>
+            </tr>
+          </thead>
+          <tbody>${detailRows}</tbody>
+        </table>
+      </div>
+    `;
+
+    document.body.appendChild(el);
+    await html2pdf().set({
+      margin: 8,
+      filename: getExportFilename('pdf'),
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    }).from(el).save();
+    document.body.removeChild(el);
+    toast('📄 דוח PDF מקצועי נוצר בהצלחה');
+  } catch (e) {
+    alert('שגיאה ביצירת PDF: ' + e.message);
+  }
+}
+
+function sendAnalyticsWhatsApp() {
+  try {
+    const analytics = getAnalyticsData(statisticsState.period, statisticsState.groupBy);
+    if (!analytics.records.length) {
+      toast('⚠️ אין נתונים לשיתוף');
+      return;
+    }
+
+    let txt = `📊 *דוח סטטיסטי - Poultry PRO*\n`;
+    txt += `תקופה: ${formatPeriodLabel(analytics.period)}\n`;
+    txt += `פילוח: ${formatGroupLabel(analytics.groupBy)}\n`;
+    txt += `הופק: ${new Date().toLocaleDateString('he-IL')}\n`;
+    txt += `╼╼╼╼╼╼╼╼╼╼╼╼\n`;
+    txt += `סה"כ עופות: *${formatNumber(analytics.totalQty)}*\n`;
+    txt += `משלוחים: *${analytics.totalShipments}*\n`;
+    txt += `ממוצע למשלוח: *${formatNumber(analytics.averageQty)}*\n`;
+    txt += `חוות פעילות: *${analytics.uniqueFarms}*\n`;
+    txt += `משחטות פעילות: *${analytics.uniqueSlaughterhouses}*\n`;
+    txt += `\n🏆 *מובילים:*\n`;
+    analytics.chartData.slice(0, 8).forEach(item => {
+      txt += `• ${item.name}: ${formatNumber(item.quantity)}\n`;
+    });
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`);
+  } catch (e) {
+    toast('שגיאה בוואטסאפ');
+  }
+}
+
+// ===============================================
+// DAILY REPORTS (REPORTS TAB)
+// ===============================================
+
+async function exportDailyExcel() {
+  try {
+    const analytics = getDailyReportAnalytics();
+    if (!analytics.records.length) return toast('⚠️ אין נתונים להיום');
+
+    if (window.ExcelJS && window.ExcelJS.Workbook) {
+      const workbook = new ExcelJS.Workbook();
+      const summary = workbook.addWorksheet('סיכום יומי', { views: [{ rightToLeft: true, showGridLines: false }] });
+      const details = workbook.addWorksheet('פירוט משלוחים', { views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }] });
+
+      // Grouping logic for Daily Breakdown (Slaughterhouse -> Farm)
+      const breakdown = {};
+      analytics.records.forEach(r => {
+        const s = r.slaughterhouse || 'כללי';
+        const f = r.farm || 'לא צוין';
+        if (!breakdown[s]) breakdown[s] = { total: 0, farms: {} };
+        breakdown[s].total += r.quantity;
+        if (!breakdown[s].farms[f]) breakdown[s].farms[f] = 0;
+        breakdown[s].farms[f] += r.quantity;
+      });
+
+      // --- SUMMARY SHEET ---
+      summary.columns = [{ width: 30 }, { width: 30 }, { width: 20 }];
+      summary.mergeCells('A1:C1');
+      const titleCell = summary.getCell('A1');
+      titleCell.value = `דוח תיפולי יומי - ${getSafeIsoDate().split('-').reverse().join('-')}`;
+      titleCell.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+      titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      summary.mergeCells('A2:C2');
+      const subTitleCell = summary.getCell('A2');
+      subTitleCell.value = `הופק: ${new Date().toLocaleString('he-IL')}`;
+      subTitleCell.alignment = { horizontal: 'center' };
+      subTitleCell.font = { italic: true, color: { argb: 'FF555555' }, size: 11 };
+
+      summary.getRow(4).values = ['סה"כ עופות היום:', analytics.totalQty, ''];
+      summary.getRow(4).font = { bold: true, size: 14 };
+      summary.getRow(5).values = ['סה"כ משלוחים:', analytics.totalShipments, ''];
+      summary.getRow(5).font = { bold: true, size: 14 };
+
+      let currRow = 7;
+      const headerRow = summary.getRow(currRow);
+      headerRow.values = ['משחטה', 'חווה', 'כמות עופות'];
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4CAF50' } };
+      currRow++;
+
+      for (const [slaughter, data] of Object.entries(breakdown)) {
+        const sRow = summary.getRow(currRow);
+        sRow.values = [slaughter, 'סה"כ למשחטה:', data.total];
+        sRow.font = { bold: true, color: {argb: 'FF1B5E20'} };
+        sRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+        sRow.eachCell(c => c.border = { top: { style: 'thin' }, bottom: { style: 'thin' } });
+        currRow++;
+
+        for (const [farm, qty] of Object.entries(data.farms)) {
+          summary.getRow(currRow).values = ['', farm, qty];
+          summary.getCell(`C${currRow}`).numFmt = '#,##0';
+          currRow++;
+        }
+      }
+
+      // --- DETAILS SHEET ---
+      details.columns = [
+        { header: 'תאריך', key: 'date', width: 15 },
+        { header: 'שעה', key: 'time', width: 10 },
+        { header: 'חווה', key: 'farm', width: 25 },
+        { header: 'כמות', key: 'qty', width: 15 },
+        { header: 'משחטה', key: 'slaughter', width: 25 },
+        { header: 'כשרות', key: 'kashrut', width: 15 },
+        { header: 'הערות', key: 'notes', width: 30 }
+      ];
+
+      details.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+      details.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+      details.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
+      details.getRow(1).height = 24;
+
+      analytics.records.forEach(r => {
+        details.addRow({
+          date: r.parsedDate ? r.parsedDate.toLocaleDateString('he-IL') : '',
+          time: r.parsedDate ? r.parsedDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '',
+          farm: r.farm,
+          qty: r.quantity,
+          slaughter: r.slaughterhouse,
+          kashrut: r.kashrut,
+          notes: r.notes
+        }).getCell('qty').numFmt = '#,##0';
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      downloadBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `Poultry_Daily_${getSafeIsoDate()}.xlsx`);
+      toast('💾 קובץ Excel מקצועי נוצר בהצלחה');
+    }
+  } catch (e) {
+    alert('שגיאה באקסל: ' + e.message);
+  }
+}
+
+async function exportDailyPDF() {
+    try {
+        const analytics = getDailyReportAnalytics();
+        if (!analytics.records.length) return toast('אין נתונים להפקת דוח יומי');
+
+        const pad = n => String(n).padStart(2, '0');
+        const fmtD = d => pad(d.getDate()) + '.' + pad(d.getMonth()+1) + '.' + d.getFullYear();
+        const fmtT = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+
+        const rawToday = getSafeIsoDate();
+        const parts = rawToday.split('-');
+        const todayDisplay = parts.length === 3 ? (parts[2] + '.' + parts[1] + '.' + parts[0]) : rawToday;
+        const nowDate = new Date();
+        const nowDisplay = fmtD(nowDate) + ', ' + fmtT(nowDate);
+
+        const sorted = analytics.records
+            .filter(r => r && r.parsedDate)
+            .slice()
+            .sort((a, b) => a.parsedDate - b.parsedDate);
+
+        const groups = {};
+        sorted.forEach(r => {
+            const s = r.slaughterhouse || 'כללי';
+            if (!groups[s]) groups[s] = { total: 0, items: [] };
+            groups[s].total += r.quantity;
+            groups[s].items.push(r);
+        });
+
+        let schedHtml = '';
+        Object.entries(groups).forEach(([name, data]) => {
+            schedHtml += '<tr class="grp"><td colspan="4">' + escapeHtml(name) + '</td></tr>';
+            data.items.forEach(r => {
+                schedHtml += '<tr>'
+                    + '<td class="c ltr">' + fmtT(r.parsedDate) + '</td>'
+                    + '<td>' + escapeHtml(r.farm || '') + '</td>'
+                    + '<td class="c bold">' + formatNumber(r.quantity) + '</td>'
+                    + '<td>' + escapeHtml(r.kashrut || '') + '</td>'
+                    + '</tr>';
+            });
+        });
+
+        let summHtml = '';
+        Object.entries(groups).forEach(([name, data]) => {
+            summHtml += '<tr>'
+                + '<td class="green bold">' + escapeHtml(name) + '</td>'
+                + '<td class="c bold">' + formatNumber(data.total) + '</td>'
+                + '</tr>';
+        });
+
+        let detHtml = '';
+        sorted.forEach((r, i) => {
+            detHtml += '<tr class="' + (i % 2 === 0 ? 'alt' : '') + '">'
+                + '<td class="c ltr">' + fmtD(r.parsedDate) + '</td>'
+                + '<td class="c ltr">' + fmtT(r.parsedDate) + '</td>'
+                + '<td>' + escapeHtml(r.slaughterhouse || '') + '</td>'
+                + '<td>' + escapeHtml(r.farm || '') + '</td>'
+                + '<td class="c bold">' + formatNumber(r.quantity) + '</td>'
+                + '<td>' + escapeHtml(r.kashrut || '') + '</td>'
+                + '</tr>';
+        });
+
+        const css = `<style>
+@import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;800&display=swap');
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.wrap {
+    direction: rtl;
+    font-family: 'Assistant', Arial, sans-serif;
+    font-size: 13px;
+    color: #222;
+    background: #fff;
+    padding: 28px 32px;
+    width: 794px;
+}
+.hdr { display: flex; flex-direction: row; justify-content: space-between; align-items: flex-end; width: 100%; border-bottom: 4px solid #1B5E20; padding-bottom: 14px; margin-bottom: 20px; }
+.hdr-l { flex: 1; }
+.hdr-r { flex: 0 0 190px; text-align: center; }
+.brand { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+.title { font-size: 30px; font-weight: 800; color: #1B5E20; line-height: 1; white-space: nowrap; }
+.sub { font-size: 13px; color: #555; margin-top: 6px; }
+.sub span { font-weight: 800; }
+.datebox { background: #F1F8E9; border: 1px solid #C8E6C9; border-radius: 10px; padding: 10px 14px; text-align: center; display: inline-block; }
+.datebox small { display: block; font-size: 10px; color: #558B2F; font-weight: 700; margin-bottom: 3px; }
+.datebox strong { display: block; font-size: 14px; font-weight: 800; color: #1B5E20; direction: ltr; white-space: nowrap; }
+.kpis { display: table; width: 100%; margin-bottom: 20px; }
+.kpi { display: table-cell; border: 1px solid #E0E0E0; border-radius: 12px; padding: 14px 8px; text-align: center; }
+.kpi + .kpi { border-right: none; }
+.kpi-v { display: block; font-size: 26px; font-weight: 800; color: #2E7D32; direction: ltr; white-space: nowrap; }
+.kpi-l { display: block; font-size: 11px; font-weight: 700; color: #777; margin-top: 5px; white-space: nowrap; }
+.sec { border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+.sec-h { background: #1B5E20; color: #fff; padding: 11px 18px; font-size: 16px; font-weight: 700; white-space: nowrap; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #F5F5F5; color: #444; font-weight: 800; font-size: 12px; padding: 9px 10px; border-bottom: 2px solid #E0E0E0; text-align: right; white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid #F0F0F0; font-size: 12.5px; white-space: nowrap; }
+.c { text-align: center; }
+.ltr { direction: ltr; unicode-bidi: isolate; }
+.bold { font-weight: 800; }
+.green { color: #2E7D32; }
+.grp td { background: #F1F8E9; color: #1B5E20; font-weight: 800; padding: 7px 14px; }
+.alt td { background: #FAFAFA; }
+.foot { text-align: center; font-size: 10px; color: #BBB; margin-top: 16px; }
+</style>`;
+
+        const body = `<div class="wrap">
+  <div class="hdr">
+    <div class="hdr-l">
+      <div class="brand">PoultryManager PRO System</div>
+      <div class="title">דוח תפעולי יומי</div>
+      <div class="sub">נתוני יום עבודה: <span>${todayDisplay}</span></div>
+    </div>
+    <div class="hdr-r">
+      <img src="${LOGO_DATA_URL}" alt="לוגו" style="height:54px; width:auto; object-fit:contain; display:block; margin:0 auto 6px auto;">
+      <div class="datebox">
+        <small>זמן הפקה</small>
+        <strong>${nowDisplay}</strong>
+      </div>
+    </div>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><span class="kpi-v">${formatNumber(analytics.totalQty)}</span><span class="kpi-l">סה"כ עופות</span></div>
+    <div class="kpi"><span class="kpi-v">${analytics.uniqueFarms}</span><span class="kpi-l">חוות פעילות</span></div>
+    <div class="kpi"><span class="kpi-v">${analytics.totalShipments}</span><span class="kpi-l">מספר משלוחים</span></div>
+  </div>
+  <div class="sec">
+    <div class="sec-h">סידור עבודה יומי</div>
+    <table>
+      <thead><tr>
+        <th class="c" style="width:70px;">שעה</th>
+        <th>שם חווה</th>
+        <th class="c" style="width:90px;">כמות</th>
+        <th style="width:110px;">כשרות</th>
+      </tr></thead>
+      <tbody>${schedHtml}</tbody>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h">סיכום לפי משחטות</div>
+    <table>
+      <thead><tr>
+        <th>שם המשחטה</th>
+        <th class="c" style="width:140px;">כמות מצטברת</th>
+      </tr></thead>
+      <tbody>${summHtml}</tbody>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h">פירוט רשומות מלא</div>
+    <table>
+      <thead><tr>
+        <th class="c" style="width:90px;">תאריך</th>
+        <th class="c" style="width:60px;">שעה</th>
+        <th>משחטה</th>
+        <th>חווה</th>
+        <th class="c" style="width:80px;">כמות</th>
+        <th style="width:90px;">כשרות</th>
+      </tr></thead>
+      <tbody>${detHtml}</tbody>
+    </table>
+  </div>
+  <div class="foot">הופק ע"י PoultryManager &bull; לשימוש פנימי בלבד &bull; 2026</div>
+</div>`;
+
+        const printCSS = `<style>
+@import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;800&display=swap');
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { direction: rtl; font-family: 'Assistant', Arial, sans-serif; font-size: 13px; color: #222; background: #fff; padding: 28px 32px; }
+.hdr { display: flex; flex-direction: row; justify-content: space-between; align-items: flex-end; width: 100%; border-bottom: 4px solid #1B5E20; padding-bottom: 14px; margin-bottom: 20px; }
+.hdr-l { flex: 1; }
+.hdr-r { flex: 0 0 190px; text-align: center; }
+.brand { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+.title { font-size: 30px; font-weight: 800; color: #1B5E20; line-height: 1; }
+.sub { font-size: 13px; color: #555; margin-top: 6px; }
+.sub span { font-weight: 800; }
+.datebox { background: #F1F8E9; border: 1px solid #C8E6C9; border-radius: 10px; padding: 10px 14px; text-align: center; display: inline-block; }
+.datebox small { display: block; font-size: 10px; color: #558B2F; font-weight: 700; margin-bottom: 3px; }
+.datebox strong { display: block; font-size: 14px; font-weight: 800; color: #1B5E20; direction: ltr; }
+.kpis { display: flex; gap: 12px; margin-bottom: 20px; }
+.kpi { flex: 1; border: 1px solid #E0E0E0; border-radius: 12px; padding: 14px 8px; text-align: center; }
+.kpi-v { display: block; font-size: 26px; font-weight: 800; color: #2E7D32; }
+.kpi-l { display: block; font-size: 11px; font-weight: 700; color: #777; margin-top: 5px; }
+.sec { border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+.sec-h { background: #1B5E20; color: #fff; padding: 11px 18px; font-size: 16px; font-weight: 700; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #F5F5F5; color: #444; font-weight: 800; font-size: 12px; padding: 9px 10px; border-bottom: 2px solid #E0E0E0; text-align: right; }
+td { padding: 9px 10px; border-bottom: 1px solid #F0F0F0; font-size: 12.5px; }
+.c { text-align: center; }
+.ltr { direction: ltr; unicode-bidi: isolate; }
+.bold { font-weight: 800; }
+.green { color: #2E7D32; }
+.grp td { background: #F1F8E9; color: #1B5E20; font-weight: 800; padding: 7px 14px; }
+.alt td { background: #FAFAFA; }
+.foot { text-align: center; font-size: 10px; color: #BBB; margin-top: 16px; }
+@media print { body { padding: 16px 20px; } }
+</style>`;
+
+        const printBody = `<div class="hdr">
+  <div class="hdr-l">
+    <div class="brand">PoultryManager PRO System</div>
+    <div class="title">דוח תפעולי יומי</div>
+    <div class="sub">נתוני יום עבודה: <span>${todayDisplay}</span></div>
+  </div>
+  <div class="hdr-r">
+    <img src="${LOGO_DATA_URL}" alt="לוגו" style="height:54px;width:auto;display:block;margin:0 auto 6px auto;">
+    <div class="datebox"><small>זמן הפקה</small><strong>${nowDisplay}</strong></div>
+  </div>
+</div>
+<div class="kpis">
+  <div class="kpi"><span class="kpi-v">${formatNumber(analytics.totalQty)}</span><span class="kpi-l">סה"כ עופות</span></div>
+  <div class="kpi"><span class="kpi-v">${analytics.uniqueFarms}</span><span class="kpi-l">חוות פעילות</span></div>
+  <div class="kpi"><span class="kpi-v">${analytics.totalShipments}</span><span class="kpi-l">מספר משלוחים</span></div>
+</div>
+<div class="sec"><div class="sec-h">סידור עבודה יומי</div>
+  <table><thead><tr><th class="c">שעה</th><th>שם חווה</th><th class="c">כמות</th><th>כשרות</th></tr></thead><tbody>${schedHtml}</tbody></table>
+</div>
+<div class="sec"><div class="sec-h">סיכום לפי משחטות</div>
+  <table><thead><tr><th>שם המשחטה</th><th class="c">כמות מצטברת</th></tr></thead><tbody>${summHtml}</tbody></table>
+</div>
+<div class="sec"><div class="sec-h">פירוט רשומות מלא</div>
+  <table><thead><tr><th class="c">תאריך</th><th class="c">שעה</th><th>משחטה</th><th>חווה</th><th class="c">כמות</th><th>כשרות</th></tr></thead><tbody>${detHtml}</tbody></table>
+</div>
+<div class="foot">הופק ע"י PoultryManager &bull; לשימוש פנימי בלבד &bull; 2026</div>`;
+
+        const w = window.open('', '_blank', 'width=900,height=700');
+        if (!w) return toast('⚠️ אפשר פתיחת חלון חדש בדפדפן');
+        w.document.open();
+        w.document.write('<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>דוח תפעולי יומי</title>' + printCSS + '</head><body>' + printBody + '</body></html>');
+        w.document.close();
+        w.focus();
+        setTimeout(() => { w.print(); }, 800);
+
+        toast('📄 הדוח נפתח - בחר "שמור כ-PDF" בתפריט ההדפסה');
+    } catch (e) {
+        console.error(e);
+        alert('שגיאה: ' + e.message);
+    }
+}
+
+function sendDailyWhatsApp() {
+  try {
+    const analytics = getDailyReportAnalytics();
+    if (!analytics.records.length) return toast('⚠️ אין נתונים לשיתוף');
+
+    const breakdown = {};
+    analytics.records.forEach(r => {
+      const s = r.slaughterhouse || 'כללי';
+      const f = r.farm || 'לא צוין';
+      if (!breakdown[s]) breakdown[s] = { total: 0, farms: {} };
+      breakdown[s].total += r.quantity;
+      if (!breakdown[s].farms[f]) breakdown[s].farms[f] = 0;
+      breakdown[s].farms[f] += r.quantity;
+    });
+
+    let txt = `📋 *דוח שיווקים יומי*\n`;
+    txt += `תאריך: ${formatIsoDateDisplay(getSafeIsoDate())}\n`;
+    txt += `╼╼╼╼╼╼╼╼╼╼╼╼\n`;
+    txt += `🐔 סה"כ עופות: *${formatNumber(analytics.totalQty)}*\n`;
+    txt += `🚛 סה"כ משלוחים: *${analytics.totalShipments}*\n\n`;
+    
+    txt += `🏭 *פילוח לפי משחטה וחוות:*\n`;
+    for (const [slaughter, data] of Object.entries(breakdown)) {
+      txt += `\n🔹 *${slaughter}* (סה"כ: ${formatNumber(data.total)})\n`;
+      for (const [farm, qty] of Object.entries(data.farms)) {
+        txt += `   └ ${farm}: ${formatNumber(qty)}\n`;
+      }
+    }
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`);
+  } catch (e) {
+    toast('שגיאה בוואטסאפ');
+  }
+}
+
+// ===============================================
+// SYSTEM FUNCTIONS
+// ===============================================
+
+function copyYesterday() {
+  try {
+    const tzOffset = new Date().getTimezoneOffset() * 60000;
+    const yesterday = new Date(Date.now() - 86400000 - tzOffset);
+    const yStr = yesterday.toISOString().slice(0, 10);
+    const yRecs = records.filter(record => record && record.datetime && String(record.datetime).startsWith(yStr));
+    if (!yRecs.length) return toast('⚠️ אין נתונים מאתמול');
+
+    const todayStr = getSafeIsoDate();
+    yRecs.forEach(record => {
+      const timePart = String(record.datetime).split('T')[1] || '08:00';
+      const clone = { ...record, id: Math.random().toString(36).slice(2, 11), datetime: todayStr + 'T' + timePart, status: 'pending' };
+      records.unshift(clone); sync(clone, 'upsert');
+    });
+    localStorage.setItem('poultry_manager_data', JSON.stringify(records)); render(); toast('✅ הנתונים הועתקו בהצלחה');
+  } catch (e) { alert('שגיאה בהעתקה: ' + e.message); }
+}
+
+function toggleDarkMode() { settings.dark = !settings.dark; document.body.classList.toggle('dark', settings.dark); saveS(); render(); }
+function saveGsUrl() { settings.gsUrl = document.getElementById('gsUrl').value; saveS(); }
+function saveS() { localStorage.setItem('poultry_manager_settings', JSON.stringify(settings)); }
+function backupData() { downloadBlob(new Blob([JSON.stringify({ records, settings })], { type: 'application/json' }), 'poultry_backup.json'); }
+function restoreData(event) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const data = JSON.parse(ev.target.result || '{}');
+    records = Array.isArray(data.records) ? data.records : [];
+    settings = data.settings || settings; saveS();
+    localStorage.setItem('poultry_manager_data', JSON.stringify(records)); location.reload();
+  };
+  reader.readAsText(event.target.files[0]);
+}
+
+// ===============================================
+// PIN PROTECTION
+// ===============================================
+let pinBuffer = '';
+
+function showPinOverlay() {
+  const overlay = document.getElementById('pinOverlay');
+  if (!overlay) return;
+  const wrap = document.getElementById('pinLogoWrap');
+  if (wrap && LOGO_DATA_URL) wrap.innerHTML = `<img src="${LOGO_DATA_URL}" style="height:60px; width:auto; object-fit:contain; filter:drop-shadow(0 2px 8px rgba(0,0,0,0.4));">`;
+  pinBuffer = '';
+  updatePinDots();
+  overlay.style.display = 'flex';
+}
+
+function hidePinOverlay() {
+  const overlay = document.getElementById('pinOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function pinPress(digit) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += digit;
+  updatePinDots();
+  if (pinBuffer.length === 4) {
+    setTimeout(() => {
+      if (pinBuffer === (settings.pin || '')) {
+        hidePinOverlay();
+        pinBuffer = '';
+      } else {
+        pinBuffer = '';
+        updatePinDots();
+        const err = document.getElementById('pinError');
+        if (err) { err.style.display = 'block'; setTimeout(() => { err.style.display = 'none'; }, 2000); }
+      }
+    }, 180);
+  }
+}
+
+function pinDel() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots();
+}
+
+function updatePinDots() {
+  document.querySelectorAll('.pin-dot').forEach((d, i) => {
+    d.style.background = i < pinBuffer.length ? '#4CAF50' : 'rgba(255,255,255,0.25)';
+    d.style.transform = i < pinBuffer.length ? 'scale(1.2)' : 'scale(1)';
+  });
+}
+
+function setPin() {
+  const newPin = prompt('הכנס קוד PIN חדש בן 4 ספרות:');
+  if (newPin === null) return;
+  if (!/^\d{4}$/.test(newPin)) { alert('קוד PIN חייב להכיל בדיוק 4 ספרות'); return; }
+  settings.pin = newPin;
+  saveS();
+  renderPinStatus();
+  toast('🔒 PIN הוגדר בהצלחה');
+}
+
+function clearPin() {
+  if (!settings.pin) { toast('⚠️ לא הוגדר PIN'); return; }
+  if (!confirm('לבטל את קוד ה-PIN?')) return;
+  settings.pin = '';
+  saveS();
+  renderPinStatus();
+  toast('🔓 PIN בוטל');
+}
+
+function renderPinStatus() {
+  const el = document.getElementById('pinStatus');
+  if (el) {
+    el.textContent = settings.pin ? '🔒 PIN פעיל' : '🔓 PIN לא מוגדר';
+    el.style.color = settings.pin ? '#2E7D32' : '#999';
+  }
+}
+
+// ===============================================
+// TEMPLATES
+// ===============================================
+function saveTemplate() {
+  const farm = getFarmValue();
+  const slaughter = getSlaughterValue();
+  const kashrut = document.getElementById('fKashrut').value.trim();
+  if (!farm) { alert('מלא שם חווה לפני שמירת תבנית'); return; }
+  rememberFarm(farm);
+  rememberSlaughterhouse(slaughter);
+  if (!settings.templates) settings.templates = [];
+  if (settings.templates.some(t => t.farm === farm && t.slaughter === slaughter)) {
+    toast('⚠️ תבנית כזו כבר קיימת'); return;
+  }
+  if (settings.templates.length >= 8) { toast('⚠️ מקסימום 8 תבניות'); return; }
+  settings.templates.push({ farm, slaughter, kashrut });
+  saveS();
+  renderTemplateChips();
+  renderSettingsTemplates();
+  toast('✅ תבנית נשמרה');
+}
+
+function loadTemplate(index) {
+  const t = (settings.templates || [])[index];
+  if (!t) return;
+  document.getElementById('fFarm').value = t.farm || '';
+  hideFarmSuggestions();
+  const slaughter = t.slaughter || '';
+  populateSlaughterSelect(slaughter);
+  const sel = document.getElementById('fSlaughterSelect');
+  if (!slaughter) {
+    if (sel) sel.value = '';
+    document.getElementById('fSlaughter').style.display = 'none';
+    document.getElementById('fSlaughter').value = '';
+  } else if (sel && getAllSlaughterhouses().includes(slaughter)) {
+    sel.value = slaughter;
+    document.getElementById('fSlaughter').style.display = 'none';
+    document.getElementById('fSlaughter').value = '';
+  } else {
+    if (sel) sel.value = '__other__';
+    document.getElementById('fSlaughter').style.display = 'block';
+    document.getElementById('fSlaughter').value = slaughter;
+  }
+  document.getElementById('fKashrut').value = t.kashrut || '';
+}
+
+function deleteTemplate(index) {
+  if (!settings.templates) return;
+  settings.templates.splice(index, 1);
+  saveS();
+  renderTemplateChips();
+  renderSettingsTemplates();
+  toast('🗑️ תבנית נמחקה');
+}
+
+function renderTemplateChips() {
+  const container = document.getElementById('templateChips');
+  if (!container) return;
+  const templates = settings.templates || [];
+  if (!templates.length) {
+    container.innerHTML = '<span style="font-size:11px; color:var(--text-secondary);">אין תבניות שמורות עדיין</span>';
+    return;
+  }
+  container.innerHTML = templates.map((t, i) => `
+    <span style="display:inline-flex;align-items:center;gap:5px;background:#E8F5E9;border:1px solid #C8E6C9;border-radius:20px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;max-width:160px;" onclick="loadTemplate(${i})" title="טען תבנית">
+      🐓 <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.farm)}</span>
+      <span onclick="event.stopPropagation();deleteTemplate(${i})" style="color:#D32F2F;font-size:15px;line-height:1;flex-shrink:0;">×</span>
+    </span>
+  `).join('');
+}
+
+function renderSettingsTemplates() {
+  const container = document.getElementById('settingsTemplates');
+  if (!container) return;
+  const templates = settings.templates || [];
+  if (!templates.length) {
+    container.innerHTML = '<span style="font-size:12px; color:var(--text-secondary);">אין תבניות שמורות</span>';
+    return;
+  }
+  container.innerHTML = templates.map((t, i) => `
+    <div style="display:flex;align-items:center;gap:8px;background:#F1F8E9;border:1px solid #C8E6C9;border-radius:12px;padding:8px 12px;width:100%;">
+      <span style="flex:1;font-size:12px;font-weight:700;">🐓 ${escapeHtml(t.farm)} ${t.slaughter ? '/ ' + escapeHtml(t.slaughter) : ''} ${t.kashrut ? '/ ' + escapeHtml(t.kashrut) : ''}</span>
+      <button onclick="deleteTemplate(${i})" style="border:none;background:none;color:#D32F2F;font-size:18px;cursor:pointer;line-height:1;">×</button>
+    </div>
+  `).join('');
+}
+
+// ===============================================
+// AUTO-SYNC
+// ===============================================
+let autoSyncTimer = null;
+let lastSyncTime = null;
+
+function saveAutoSync() {
+  const sel = document.getElementById('autoSyncSelect');
+  settings.autoSyncMins = parseInt(sel ? sel.value : 0) || 0;
+  saveS();
+  startAutoSync();
+  toast(settings.autoSyncMins ? `☁️ סנכרון אוטומטי כל ${settings.autoSyncMins} דקות` : '☁️ סנכרון אוטומטי כבוי');
+}
+
+function startAutoSync() {
+  if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
+  const mins = parseInt(settings.autoSyncMins) || 0;
+  if (!mins || !settings.gsUrl) return;
+  autoSyncTimer = setInterval(async () => {
+    try {
+      const res = await fetch(settings.gsUrl);
+      const cloudData = await res.json();
+      if (cloudData && Array.isArray(cloudData)) {
+        const cloudIds = new Set(cloudData.map(r => r.id));
+        const localPending = records.filter(r => r.status === 'pending' && !cloudIds.has(r.id));
+        records = [...cloudData, ...localPending];
+        localStorage.setItem('poultry_manager_data', JSON.stringify(records));
+        render();
+        lastSyncTime = new Date();
+        updateLastSyncLabel();
+      }
+    } catch (e) { /* silent fail for auto-sync */ }
+  }, mins * 60 * 1000);
+}
+
+function updateLastSyncLabel() {
+  const el = document.getElementById('lastSyncLabel');
+  if (el && lastSyncTime) el.textContent = `סנכרון אחרון: ${lastSyncTime.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+// ===============================================
+// KASHRUT FILTER (HISTORY)
+// ===============================================
+let activeKashrutFilter = '';
+
+function setKashrutFilter(val) {
+  activeKashrutFilter = val;
+  document.querySelectorAll('#historyView .filter-chip').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === (val || 'הכל'));
+  });
+  render();
+}
+
+// startup runs after all code - see bottom of script
+
+// ===============================================
+// DAILY DEMANDS (דרישות יומיות)
+// ===============================================
+const DEFAULT_FARMS = [
+  'בית יתיר',
+  'בניה',
+  'גבעת ברנר',
+  'גילת',
+  'גילת חדשה - עומר',
+  'הודיה',
+  'זרועה',
+  'טללים',
+  'יד נתן',
+  'כפר הריף',
+  'כרמיה',
+  'כרמל',
+  'מבקיעים א',
+  'מבקיעים ב\'',
+  'מבקיעים ג\'',
+  'מצליח אלי',
+  'מצליח אליהו',
+  'מצליח אלברט',
+  'נחלה',
+  'סגולה',
+  'עוזה א',
+  'עוזה ב',
+  'עמיעוז פטם 1',
+  'עמיעוז אוהד',
+  'קלחים חורשה א\'',
+  'קלחים חורשה ג\'',
+  'קלחים חורשה ב\'',
+  'קלחים יואב',
+  'קלחים פרדס',
+  'שדה עוזיה -ארבל',
+  'שדה עוזיה חווה',
+  'שדה עוזיה בית',
+  'אמונים',
+  'שוקדה',
+  'שוקדה חדשה',
+  'שחר',
+  'שדה יואב ב\'',
+  'שדה יואב א\'',
+  'שדה יואב ג\'',
+  'שדה משה',
+  'גבעת ברוך',
+  'כמריה',
+  'שדה יואב',
+  'דישון',
+  'שמוליק',
+  'בארות יצחק – אסא',
+  'בארות יצחק – חגי',
+  'בארות יצחק – הושע',
+  'קבוצת יבנה',
+  'עבדון',
+  'שומרה',
+  'מירון אברהמי',
+  'מושב כנף – עוזי יצחק',
+  'עזרא עוף חי',
+  'גבעת יואב',
+  'צוריאל',
+  'דמשטי – משמר השבעה',
+  'עמינדב',
+  'זנוח',
+  'נס הרים',
+  'כפר טרומן – חייסין 11',
+  'כפר טרומן – חייסין 31',
+  'כפר טרומן – חייסין 36',
+  'שדה עוז',
+  'אופק',
+  'חורשים',
+  'זרועה – זבד',
+  'זרחיה',
+  'אמונים – נחום',
+  'הבונים – אורי',
+  'כפר מימון',
+  'בני ראם',
+  'עין חרוד',
+  'גבעתי',
+  'נסלון',
+  'חוות נצר דקל'
+];
+const DEFAULT_SLAUGHTERHOUSES = ['מעוף','טרי וחלק','מישור','אשקלון','עטרות','מעוף 2','סלק אל קודס','חוסם (תרקומייה)'];
+let derishotDate = getSafeIsoDate();
+let derishotPanelOpen = true;
+
+function getDerishott() {
+  try { return JSON.parse(localStorage.getItem('poultry_derishott') || '{}'); } catch { return {}; }
+}
+function saveDerishotStorage(data) {
+  localStorage.setItem('poultry_derishott', JSON.stringify(data));
+}
+
+function getDerishotSlaughterhouses() {
+  return getPlanSlaughterhouses();
+}
+
+function getPlanSlaughterhouses() {
+  return uniqueNames([...DEFAULT_SLAUGHTERHOUSES, 'כללי']);
+}
+
+function getPlanBucketForSlaughterhouse(name, planMap) {
+  const clean = normalizeName(name);
+  if (getPlanSlaughterhouses().includes(clean)) return clean;
+  return 'כללי';
+}
+
+function normalizePlanMapForCalendar(dayMap) {
+  const normalized = {};
+  Object.entries(dayMap || {}).forEach(([name, qty]) => {
+    const amount = Number(qty) || 0;
+    if (amount <= 0) return;
+    const bucket = getPlanBucketForSlaughterhouse(name);
+    normalized[bucket] = (normalized[bucket] || 0) + amount;
+  });
+  return normalized;
+}
+
+function normalizeName(value) {
+  return String(value || '').trim();
+}
+
+function uniqueNames(names) {
+  const seen = new Set();
+  return names.map(normalizeName).filter(name => {
+    if (!name || seen.has(name)) return false;
+    seen.add(name);
+    return true;
+  });
+}
+
+function getAllFarms() {
+  const fromSettings = settings.extraFarms || [];
+  const fromRecords = records.map(item => item && item.farm);
+  const fromTemplates = (settings.templates || []).map(item => item && item.farm);
+  return uniqueNames([...DEFAULT_FARMS, ...fromSettings, ...fromRecords, ...fromTemplates]);
+}
+
+function rememberFarm(name) {
+  const clean = normalizeName(name);
+  if (!clean || DEFAULT_FARMS.includes(clean)) return;
+  const extra = uniqueNames(settings.extraFarms || []);
+  if (!extra.includes(clean)) {
+    settings.extraFarms = [...extra, clean];
+    saveS();
+  }
+}
+
+function renderFarmSuggestions() {
+  const input = document.getElementById('fFarm');
+  const box = document.getElementById('farmSuggestions');
+  if (!input || !box) return;
+  const q = normalizeName(input.value);
+  if (!q) {
+    hideFarmSuggestions();
+    return;
+  }
+  const qLower = q.toLowerCase();
+  const matches = getAllFarms()
+    .filter(name => name.toLowerCase().startsWith(qLower))
+    .slice(0, 16);
+  if (!matches.length) {
+    hideFarmSuggestions();
+    return;
+  }
+  box.innerHTML = matches.map(name => `
+    <button type="button" data-farm="${escapeHtml(name)}" onclick="chooseFarmSuggestion(this.dataset.farm)" style="width:100%; border:none; border-bottom:1px solid var(--border); background:var(--surface); color:var(--text); padding:11px 12px; text-align:right; font-size:14px; font-weight:700; cursor:pointer;">
+      🐓 ${escapeHtml(name)}
+    </button>
+  `).join('');
+  box.style.display = 'block';
+}
+
+function chooseFarmSuggestion(name) {
+  const input = document.getElementById('fFarm');
+  if (input) input.value = name;
+  hideFarmSuggestions();
+}
+
+function enableManualFarm() {
+  const input = document.getElementById('fFarm');
+  if (!input) return;
+  hideFarmSuggestions();
+  input.value = '';
+  input.placeholder = 'הכנס שם חווה ידנית';
+  input.focus();
+}
+
+function hideFarmSuggestions() {
+  const box = document.getElementById('farmSuggestions');
+  if (box) box.style.display = 'none';
+}
+
+function getFarmValue() {
+  return normalizeName(document.getElementById('fFarm')?.value);
+}
+
+function getAllSlaughterhouses() {
+  const blocked = [
+    'כללי',
+    'מעוף מעיין יסכה',
+    'טרי חלק',
+    'סנטרל גלאט (לנדא)',
+    'עוף חברון (מישור)',
+    'הדס יסכה (אשקלון)',
+    'מסלק אל קודס (חוסם משחטה)',
+    'חוסם (תרקומייה פלסטיק)'
+  ];
+  const fromSettings = settings.extraSlaughterhouses || [];
+  return uniqueNames([...DEFAULT_SLAUGHTERHOUSES, ...fromSettings])
+    .filter(name => !blocked.includes(name));
+}
+
+function rememberSlaughterhouse(name) {
+  const clean = normalizeName(name);
+  if (!clean || clean === 'כללי' || DEFAULT_SLAUGHTERHOUSES.includes(clean)) return;
+  if (['מעוף מעיין יסכה','טרי חלק','סנטרל גלאט (לנדא)','עוף חברון (מישור)','הדס יסכה (אשקלון)','מסלק אל קודס (חוסם משחטה)','חוסם (תרקומייה פלסטיק)'].includes(clean)) return;
+  const extra = uniqueNames(settings.extraSlaughterhouses || []);
+  if (!extra.includes(clean)) {
+    settings.extraSlaughterhouses = [...extra, clean];
+    saveS();
+  }
+}
+
+function cleanSlaughterhouseSettings() {
+  const before = settings.extraSlaughterhouses || [];
+  const allowed = getAllSlaughterhouses().filter(name => !DEFAULT_SLAUGHTERHOUSES.includes(name));
+  settings.extraSlaughterhouses = uniqueNames(before).filter(name => allowed.includes(name));
+  saveS();
+}
+
+function populateSlaughterSelect(selectedValue) {
+  const sel = document.getElementById('fSlaughterSelect');
+  if (!sel) return;
+  const selected = normalizeName(selectedValue);
+  const allNames = getAllSlaughterhouses();
+  const names = allNames;
+  sel.innerHTML = '<option value="">— בחר משחטה —</option>'
+    + names.map(name => `<option value="${escapeHtml(name)}">🏭 ${escapeHtml(name)}</option>`).join('')
+    + '<option value="__other__">✏️ אחר (הכנס ידנית)</option>';
+  sel.value = names.includes(selected) ? selected : '';
+}
+
+function toggleDerishotPanel() {
+  derishotPanelOpen = !derishotPanelOpen;
+  const panel = document.getElementById('derishotPanel');
+  const arrow = document.getElementById('derishotToggleArrow');
+  if (panel) panel.style.display = derishotPanelOpen ? 'block' : 'none';
+  if (arrow) arrow.style.transform = derishotPanelOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+}
+
+function openDerishotDatePicker() {
+  const inp = document.getElementById('derishotDateInput');
+  if (!inp) return;
+  inp.value = derishotDate;
+  inp.showPicker ? inp.showPicker() : inp.click();
+}
+
+function changeDerishotDate(val) {
+  if (!val) return;
+  derishotDate = val;
+  renderDerishotGrid();
+}
+
+function renderDerishotGrid() {
+  const grid = document.getElementById('derishotGrid');
+  const label = document.getElementById('derishotDateLabel');
+  if (!grid) return;
+
+  // Format date in Hebrew
+  const [y, m, d] = derishotDate.split('-');
+  const dateHe = `${d}.${m}.${y}`;
+  const isToday = derishotDate === getSafeIsoDate();
+  if (label) label.textContent = `${isToday ? 'היום — ' : ''}${dateHe}`;
+
+  const derishott = getDerishott();
+  const dayData = derishott[derishotDate] || {};
+  const slaughterhouses = getDerishotSlaughterhouses();
+
+  // Get actual quantities for this date from records
+  const actualMap = {};
+  records.forEach(r => {
+    const rd = getRecordDate(r);
+    if (!rd) return;
+    const rDate = getDateKey(rd);
+    if (rDate !== derishotDate) return;
+    const s = r.slaughterhouse || 'כללי';
+    actualMap[s] = (actualMap[s] || 0) + (Number(r.quantity) || 0);
+  });
+
+  // Build grid rows
+  const rows = slaughterhouses.map(s => {
+    const demand = dayData[s] || 0;
+    const actual = actualMap[s] || 0;
+    const pct = demand > 0 ? Math.round(actual / demand * 100) : null;
+    const barCol = pct === null ? '#ccc' : pct >= 100 ? '#2E7D32' : pct >= 70 ? '#F9A825' : '#E53935';
+    const barW = demand > 0 ? Math.min(100, Math.round(actual / demand * 100)) : 0;
+    const isKlali = s === 'כללי';
+
+    return `<div style="border:1px solid ${isKlali ? 'rgba(0,0,0,0.08)' : 'var(--border)'}; border-radius:14px; padding:12px 14px; margin-bottom:10px; background:${isKlali ? 'rgba(0,0,0,0.02)' : 'var(--background)'};">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:800; font-size:14px; color:var(--primary);">${isKlali ? '🔲 כללי (אופציונלי)' : '🏭 ' + escapeHtml(s)}</div>
+        <div style="font-size:11px; color:var(--text-secondary);">בפועל: <b style="color:${actual > 0 ? '#1B5E20' : '#bbb'};">${actual > 0 ? formatNumber(actual) : '—'}</b></div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="number" inputmode="numeric" placeholder="דרישה..."
+          id="drs_${s.replace(/\s/g,'_')}"
+          value="${demand || ''}"
+          style="flex:1; padding:9px 12px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:15px; font-weight:700; text-align:center;">
+        ${pct !== null ? `<div style="font-size:13px; font-weight:800; color:${barCol}; min-width:38px; text-align:center;">${pct}%</div>` : '<div style="min-width:38px;"></div>'}
+      </div>
+      ${demand > 0 ? `<div style="margin-top:8px; background:#eee; border-radius:20px; height:7px; overflow:hidden;">
+        <div style="background:${barCol}; height:100%; width:${barW}%; border-radius:20px; transition:width 0.4s;"></div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  grid.innerHTML = rows;
+}
+
+function saveDerishott() {
+  const slaughterhouses = getDerishotSlaughterhouses();
+  const derishott = getDerishott();
+  if (!derishott[derishotDate]) derishott[derishotDate] = {};
+
+  const dayData = {};
+  slaughterhouses.forEach(s => {
+    const inp = document.getElementById('drs_' + s.replace(/\s/g,'_'));
+    const val = inp ? Number(inp.value) || 0 : 0;
+    if (val > 0) { derishott[derishotDate][s] = val; dayData[s] = val; }
+    else delete derishott[derishotDate][s];
+  });
+
+  saveDerishotStorage(derishott);
+  renderDerishotGrid();
+  toast('✅ דרישות נשמרו ל-' + derishotDate.split('-').reverse().join('.'));
+
+  // Sync to Google Sheets
+  const url = document.getElementById('gsUrl')?.value || settings.gsUrl || MASTER_URL;
+  if (url) {
+    fetch(url, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({ type: 'derishott', date: derishotDate, derishott: dayData })
+    }).catch(() => {});
+  }
+}
+
+function copyDerishotFromYesterday() {
+  const yesterday = new Date(derishotDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yKey = getDateKey(yesterday);
+  const derishott = getDerishott();
+  const yData = derishott[yKey];
+  if (!yData || !Object.keys(yData).length) {
+    toast('⚠️ אין דרישות מאתמול להעתקה'); return;
+  }
+  derishott[derishotDate] = { ...yData };
+  saveDerishotStorage(derishott);
+  renderDerishotGrid();
+  toast('📋 הועתק מ-' + yKey.split('-').reverse().join('.'));
+}
+
+function initDerishotPanel() {
+  derishotDate = getSafeIsoDate();
+  renderDerishotGrid();
+}
+
+const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+let planEditCtx = null;
+
+function getPlan() {
+  try { return JSON.parse(localStorage.getItem('poultry_plan_daily') || '{}'); } catch { return {}; }
+}
+function savePlan(plan) {
+  localStorage.setItem('poultry_plan_daily', JSON.stringify(plan));
+}
+
+// Plan navigation state
+let planNavYear = new Date().getFullYear();
+let planNavMonth = new Date().getMonth();
+
+function initPlanYearSelect() {
+  const sel = document.getElementById('planNavYear');
+  if (!sel) return;
+  const y = new Date().getFullYear();
+  sel.innerHTML = [y-1, y, y+1, y+2].map(yr => `<option value="${yr}" ${yr===planNavYear?'selected':''}>${yr}</option>`).join('');
+  const msel = document.getElementById('planNavMonth');
+  if (msel) msel.value = planNavMonth;
+}
+
+function planNavigate() {
+  planNavYear = Number(document.getElementById('planNavYear').value);
+  planNavMonth = Number(document.getElementById('planNavMonth').value);
+  renderPlanView();
+}
+function planPrevMonth() {
+  planNavMonth--; if (planNavMonth < 0) { planNavMonth = 11; planNavYear--; }
+  initPlanYearSelect(); renderPlanView();
+}
+function planNextMonth() {
+  planNavMonth++; if (planNavMonth > 11) { planNavMonth = 0; planNavYear++; }
+  initPlanYearSelect(); renderPlanView();
+}
+function planToday() {
+  planNavYear = new Date().getFullYear();
+  planNavMonth = new Date().getMonth();
+  initPlanYearSelect(); renderPlanView();
+}
+
+// Edit modal state
+
+
+function openPlanModal(dateKey, slaughter) {
+  const plan = getPlan();
+  const current = plan[dateKey]?.[slaughter] || 0;
+  const [y, m, d] = dateKey.split('-');
+  const dayName = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][new Date(dateKey).getDay()];
+  document.getElementById('planModalTitle').textContent = `🏭 ${slaughter}`;
+  document.getElementById('planModalSub').textContent = `יום ${dayName} — ${d}.${m}.${y}`;
+  document.getElementById('planTargetInput').value = current || '';
+
+  // Quick buttons from recent values for this slaughterhouse
+  const recent = new Set();
+  Object.values(plan).forEach(day => { if (day[slaughter]) recent.add(day[slaughter]); });
+  const top = [...recent].sort((a,b)=>b-a).slice(0,4);
+  document.getElementById('planQuickBtns').innerHTML = top.map(v =>
+    `<button onclick="document.getElementById('planTargetInput').value=${v}" style="padding:8px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--primary); font-weight:800; font-size:13px; cursor:pointer;">${formatNumber(v)}</button>`
+  ).join('');
+
+  planEditCtx = { dateKey, slaughter };
+  document.getElementById('planModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('planTargetInput').focus(), 100);
+}
+
+function closePlanModal() {
+  document.getElementById('planModal').style.display = 'none';
+  planEditCtx = null;
+}
+
+function savePlanTarget() {
+  if (!planEditCtx) return;
+  const { dateKey, slaughter } = planEditCtx;
+  const val = Number(document.getElementById('planTargetInput').value) || 0;
+  const plan = getPlan();
+  if (!plan[dateKey]) plan[dateKey] = {};
+  if (val > 0) plan[dateKey][slaughter] = val;
+  else delete plan[dateKey][slaughter];
+  if (!Object.keys(plan[dateKey]).length) delete plan[dateKey];
+  savePlan(plan);
+  closePlanModal();
+  renderPlanView();
+  toast('✅ יעד נשמר');
+
+  // Sync to Google Sheets
+  const url = document.getElementById('gsUrl')?.value || settings.gsUrl || MASTER_URL;
+  if (url) {
+    fetch(url, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({ type: 'tochnit', date: dateKey, slaughter, qty: val })
+    }).catch(() => {});
+  }
+}
+
+function clearPlanTarget() {
+  document.getElementById('planTargetInput').value = '';
+  savePlanTarget();
+}
+
+function renderPlanView() {
+  initPlanYearSelect();
+  const plan = getPlan();
+  const slaughterhouses = getPlanSlaughterhouses();
+  const today = getSafeIsoDate();
+
+  // Build actual map: dateKey -> slaughter -> qty
+  const actualMap = {};
+  records.forEach(r => {
+    const d = getRecordDate(r);
+    if (!d) return;
+    const dk = getDateKey(d);
+    const s = getPlanBucketForSlaughterhouse(r.slaughterhouse);
+    if (!actualMap[dk]) actualMap[dk] = {};
+    actualMap[dk][s] = (actualMap[dk][s] || 0) + (Number(r.quantity) || 0);
+  });
+
+  // Days in month
+  const daysInMonth = new Date(planNavYear, planNavMonth + 1, 0).getDate();
+  const DAYS_HE = ['א','ב','ג','ד','ה','ו','ש'];
+
+  // Build table
+  const colW = 72;
+  let headerCols = slaughterhouses.map(s =>
+    `<th style="min-width:${colW}px; padding:8px 4px; background:#1B5E20; color:#fff; font-size:11px; font-weight:800; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:5; box-shadow:0 2px 0 rgba(0,0,0,0.08);">${s}</th>`
+  ).join('');
+
+  let monthTarget = 0, monthActual = 0;
+
+  let rows = '';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const mm = String(planNavMonth + 1).padStart(2,'0');
+    const dd = String(day).padStart(2,'0');
+    const dk = `${planNavYear}-${mm}-${dd}`;
+    const dow = new Date(dk).getDay(); // 0=Sun
+    const isToday = dk === today;
+    const isSaturday = dow === 6;
+    const isWeekend = dow === 5 || dow === 6;
+    const dayPlan = normalizePlanMapForCalendar(plan[dk] || {});
+    const dayActual = actualMap[dk] || {};
+
+    const dayTotal = slaughterhouses.reduce((s,k) => s + (dayPlan[k]||0), 0);
+    const dayActualTotal = slaughterhouses.reduce((s,k) => s + (dayActual[k]||0), 0);
+    monthTarget += dayTotal;
+    monthActual += dayActualTotal;
+
+    const rowBg = isToday ? '#E8F5E9' : isSaturday ? '#FFF3E0' : isWeekend ? '#FFF8E1' : '';
+    const cells = slaughterhouses.map(s => {
+      const target = dayPlan[s] || 0;
+      const actual = dayActual[s] || 0;
+      const pct = target > 0 ? Math.round(actual/target*100) : null;
+      const bg = pct === null ? '' : pct >= 100 ? '#E8F5E9' : pct >= 70 ? '#FFF8E1' : actual > 0 ? '#FFEBEE' : '';
+      const col = pct === null ? '' : pct >= 100 ? '#2E7D32' : pct >= 70 ? '#F57F17' : '#C62828';
+      return `<td style="padding:2px 3px; text-align:center; background:${bg}; cursor:pointer; border-left:1px solid #eee;" onclick="openPlanModal('${dk}','${s}')">
+        ${target ? `<div style="font-size:12px; font-weight:800; color:#1B5E20;">${(target/1000).toFixed(1)}k</div>` : `<div style="font-size:11px; color:#ccc;">—</div>`}
+        ${actual ? `<div style="font-size:10px; color:${col}; font-weight:700;">${(actual/1000).toFixed(1)}k</div>` : ''}
+      </td>`;
+    }).join('');
+
+    const totalPct = dayTotal > 0 ? Math.round(dayActualTotal/dayTotal*100) : null;
+    rows += `<tr style="border-bottom:1px solid #eee; ${rowBg ? 'background:' + rowBg + ';' : ''}">
+      <td style="padding:6px 8px; font-weight:${isToday?'900':'700'}; font-size:12px; white-space:nowrap; position:sticky; right:0; background:${rowBg||'var(--surface)'}; z-index:1; border-left:2px solid #ddd;">
+        <span style="font-size:10px; color:#aaa; display:block;">${DAYS_HE[dow]}'</span>
+        <span style="${isToday ? 'color:#1B5E20;' : isSaturday ? 'color:#E65100;' : ''}">${dd}/${mm}</span>
+        ${dayTotal > 0 ? `<div style="font-size:9px; color:${totalPct >= 100 ? '#2E7D32' : totalPct >= 70 ? '#F57F17' : totalPct !== null ? '#C62828' : '#888'}; font-weight:800; margin-top:1px;">${totalPct !== null ? totalPct+'%' : '✏️'}</div>` : ''}
+      </td>
+      ${cells}
+    </tr>`;
+  }
+
+  const monthPct = monthTarget > 0 ? Math.round(monthActual/monthTarget*100) : null;
+  const pctCol = monthPct === null ? '#999' : monthPct >= 100 ? '#2E7D32' : monthPct >= 70 ? '#F57F17' : '#C62828';
+
+  const grid = document.getElementById('planDailyGrid');
+  if (!grid) return;
+  grid.innerHTML = `
+    <div style="overflow:visible;">
+      <table style="border-collapse:collapse; width:100%; min-width:${60 + slaughterhouses.length * colW}px;">
+        <thead><tr>
+          <th style="min-width:60px; padding:8px; background:#1B5E20; color:#fff; font-size:11px; position:sticky; right:0; top:0; z-index:6; box-shadow:0 2px 0 rgba(0,0,0,0.08);">תאריך</th>
+          ${headerCols}
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  const summary = document.getElementById('planMonthlySummary');
+  if (summary) summary.innerHTML = `
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+      <div style="background:var(--surface); border-radius:12px; padding:12px; box-shadow:var(--shadow); text-align:center;">
+        <div style="font-size:18px; font-weight:800; color:#1B5E20;">${formatNumber(monthTarget)}</div>
+        <div style="font-size:10px; color:var(--text-secondary); margin-top:3px; font-weight:700;">🎯 יעד חודשי</div>
+      </div>
+      <div style="background:var(--surface); border-radius:12px; padding:12px; box-shadow:var(--shadow); text-align:center;">
+        <div style="font-size:18px; font-weight:800; color:#388E3C;">${formatNumber(monthActual)}</div>
+        <div style="font-size:10px; color:var(--text-secondary); margin-top:3px; font-weight:700;">✅ בפועל</div>
+      </div>
+      <div style="background:var(--surface); border-radius:12px; padding:12px; box-shadow:var(--shadow); text-align:center;">
+        <div style="font-size:18px; font-weight:800; color:${pctCol};">${monthPct !== null ? monthPct + '%' : '—'}</div>
+        <div style="font-size:10px; color:var(--text-secondary); margin-top:3px; font-weight:700;">📈 ביצוע</div>
+      </div>
+    </div>`;
+}
+
+// Excel: תכנון מול ביצוע יומי
+function handleSlaughterSelect() {
+  const sel = document.getElementById('fSlaughterSelect');
+  const manual = document.getElementById('fSlaughter');
+  if (sel.value === '__other__') {
+    manual.style.display = 'block';
+    manual.focus();
+  } else {
+    manual.style.display = 'none';
+    manual.value = '';
+  }
+}
+
+function getSlaughterValue() {
+  const sel = document.getElementById('fSlaughterSelect');
+  if (!sel) return '';
+  if (sel.value === '__other__') return document.getElementById('fSlaughter').value.trim();
+  return sel.value || '';
+}
+
+async function exportPlanVsActualExcel() {
+  try {
+    const chosen = await new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;';
+      overlay.innerHTML = `
+        <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:500px;">
+        <div style="font-weight:800;font-size:18px;margin-bottom:6px;">📊 תכנון שחיטות מול ביצוע</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">בחר תאריך לדוח שחיטות</div>
+          <input type="date" id="planExcelDatePicker" value="${getSafeIsoDate()}"
+            style="width:100%;padding:14px;border-radius:12px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:18px;font-weight:700;text-align:center;margin-bottom:16px;">
+          <div style="display:flex;gap:10px;">
+            <button id="planExcelCancel" style="flex:1;padding:14px;border-radius:14px;border:1px solid var(--border);background:none;color:var(--text);font-weight:800;font-size:15px;cursor:pointer;">ביטול</button>
+            <button id="planExcelOk" style="flex:2;padding:14px;border-radius:14px;border:none;background:#1B5E20;color:#fff;font-weight:800;font-size:15px;cursor:pointer;">📊 הפק דוח</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      document.getElementById('planExcelOk').onclick = () => { const v = document.getElementById('planExcelDatePicker').value; document.body.removeChild(overlay); resolve(v); };
+      document.getElementById('planExcelCancel').onclick = () => { document.body.removeChild(overlay); resolve(null); };
+    });
+    if (!chosen) return;
+
+    toast('⏳ מכין דוח...');
+
+    const [cy, cm, cdd] = chosen.split('-');
+    const dateLabel = `${cdd}.${cm}.${cy}`;
+    const DAYS_HE_FULL = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+    const dayName = DAYS_HE_FULL[new Date(chosen).getDay()];
+
+    // 1. Collect actual records for the selected date
+    const actualRows = [];
+    const bySlaughterFarm = {};
+    const bySlaughter = {};
+    records.forEach(r => {
+      const d = getRecordDate(r);
+      if (!d || getDateKey(d) !== chosen) return;
+      actualRows.push({
+        slaughterhouse: r.slaughterhouse || 'אחר',
+        farm: r.farm || 'לא ידוע',
+        quantity: Number(r.quantity) || 0
+      });
+    });
+
+    // 2. Plan source
+    let planMap = {};
+    const localDerishott = getDerishott();
+    if (localDerishott[chosen] && Object.keys(localDerishott[chosen]).length > 0) {
+      planMap = normalizePlanMapForCalendar(localDerishott[chosen]);
+    } else {
+      const localPlan = getPlan();
+      if (localPlan[chosen] && Object.keys(localPlan[chosen]).length > 0) {
+        planMap = normalizePlanMapForCalendar(localPlan[chosen]);
+      }
+    }
+    const hasPlan = Object.keys(planMap).length > 0;
+    const planSource = hasPlan
+      ? (localDerishott[chosen] ? '📋 מקור תכנון שחיטות: דרישות יומיות' : '📅 מקור תכנון שחיטות: לוח תכנית שנתית')
+      : '⚠️ לא נמצא תכנון — מוצגים שיווקים בלבד';
+
+    actualRows.forEach(item => {
+      const label = getPlanBucketForSlaughterhouse(item.slaughterhouse);
+      if (!bySlaughterFarm[label]) bySlaughterFarm[label] = {};
+      bySlaughterFarm[label][item.farm] = (bySlaughterFarm[label][item.farm] || 0) + item.quantity;
+      bySlaughter[label] = (bySlaughter[label] || 0) + item.quantity;
+    });
+
+    // 3. Active slaughterhouses (have plan or actual)
+    const activeSlaughters = [...new Set([
+      ...getPlanSlaughterhouses(),
+      ...Object.keys(bySlaughter),
+      ...Object.keys(planMap)
+    ])].filter(s => (planMap[s] || 0) > 0 || (bySlaughter[s] || 0) > 0);
+
+    // 4. Max farms across all slaughterhouses
+    const farmsPerSlaughter = {};
+    activeSlaughters.forEach(s => {
+      farmsPerSlaughter[s] = Object.entries(bySlaughterFarm[s] || {}).sort((a,b) => b[1]-a[1]);
+    });
+    const maxFarms = Math.max(1, ...activeSlaughters.map(s => farmsPerSlaughter[s].length));
+
+    // Col layout:
+    // A: משחטה | B: תכנון (if hasPlan) | C: ביצוע בפועל
+    // then pairs: שם חווה + כמות עופות  x maxFarms
+    // last: אחוז ביצוע (if hasPlan)
+    const fixedLeft = hasPlan ? 3 : 2;   // משחטה + [תכנון] + ביצוע
+    const farmCols  = maxFarms * 2;       // name+qty per farm
+    const fixedRight = hasPlan ? 1 : 0;  // אחוז
+    const totalCols = fixedLeft + farmCols + fixedRight;
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('תכנון שחיטות', { views: [{ rightToLeft: true }] });
+
+    // Row 1: Title
+    ws.mergeCells(1,1,1,totalCols);
+    const titleCell = ws.getCell(1,1);
+    titleCell.value = `תכנון שחיטות מול ביצוע יומי — יום ${dayName} ${dateLabel}`;
+    titleCell.font = { size:15, bold:true, color:{argb:'FFFFFFFF'} };
+    titleCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1B5E20'} };
+    titleCell.alignment = { horizontal:'center', vertical:'middle' };
+    ws.getRow(1).height = 30;
+
+    // Row 2: Source
+    ws.mergeCells(2,1,2,totalCols);
+    const srcCell = ws.getCell(2,1);
+    srcCell.value = planSource;
+    srcCell.font = { italic:true, size:11, color:{argb: hasPlan ? 'FF1B5E20' : 'FFF57F17'} };
+    srcCell.alignment = { horizontal:'center' };
+    ws.getRow(2).height = 18;
+
+    // Row 3: Section header "פירוט חוות" over farm columns
+    ws.mergeCells(3, fixedLeft+1, 3, fixedLeft+farmCols);
+    const farmSecCell = ws.getCell(3, fixedLeft+1);
+    farmSecCell.value = 'פירוט חוות';
+    farmSecCell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
+    farmSecCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF558B2F'} };
+    farmSecCell.alignment = { horizontal:'center', vertical:'middle' };
+    ws.getRow(3).height = 20;
+
+    // Row 4: Column headers
+    const hData = ['משחטה'];
+    if (hasPlan) hData.push('תכנון');
+    hData.push('ביצוע בפועל');
+    for (let i = 0; i < maxFarms; i++) { hData.push('שם חווה'); hData.push('כמות עופות'); }
+    if (hasPlan) hData.push('אחוז ביצוע');
+    const hRow = ws.addRow(hData); // row 4
+    hRow.eachCell((cell, col) => {
+      cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:11 };
+      // Farm cols get lighter green
+      const isFarmCol = col >= fixedLeft+1 && col <= fixedLeft+farmCols;
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: isFarmCol ? 'FF66BB6A' : 'FF2E7D32'} };
+      cell.alignment = { horizontal:'center', vertical:'middle' };
+    });
+    ws.getRow(4).height = 24;
+
+    let totalPlan = 0, totalActual = 0;
+
+    activeSlaughters.forEach((s, idx) => {
+      const planned = planMap[s] || 0;
+      const actual  = bySlaughter[s] || 0;
+      if (planned === 0 && actual === 0) return;
+      totalPlan   += planned;
+      totalActual += actual;
+      const pct = planned > 0 ? Math.round(actual/planned*100) : null;
+      const farms = farmsPerSlaughter[s] || [];
+      const isExternal = s === 'סלק אל קודס' || s === 'חוסם (תרקומייה)' || s === 'כללי';
+      const rowBg  = idx % 2 === 0 ? 'FFFAFAFA' : 'FFFFFFFF';
+      const farmBg = isExternal ? 'FFFFF3E0' : 'FFF1F8E9';
+
+      const rowData = [s];
+      if (hasPlan) rowData.push(planned || '—');
+      rowData.push(actual || '—');
+      for (let i = 0; i < maxFarms; i++) {
+        rowData.push(i < farms.length ? farms[i][0] : '');
+        rowData.push(i < farms.length ? farms[i][1] : '');
+      }
+      if (hasPlan) rowData.push(pct !== null ? pct+'%' : '—');
+
+      const row = ws.addRow(rowData);
+      row.height = 22;
+      row.eachCell((cell, col) => {
+        const isFarmCol = col >= fixedLeft+1 && col <= fixedLeft+farmCols;
+        cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: isFarmCol ? farmBg : rowBg} };
+        cell.alignment = { horizontal:'center', vertical:'middle' };
+        // Farm name cols bold
+        if (isFarmCol && col % 2 === (fixedLeft+1) % 2) cell.font = { bold:true, size:11 };
+      });
+      row.getCell(1).alignment = { horizontal:'right' };
+      row.getCell(1).font = { bold:true };
+      if (hasPlan && pct !== null) {
+        const col = pct>=100 ? 'FF1B5E20' : pct>=70 ? 'FFF57F17' : 'FFC62828';
+        row.getCell(totalCols).font = { bold:true, color:{argb:col} };
+      }
+    });
+
+    // Totals
+    ws.addRow([]);
+    const totalPct = totalPlan > 0 ? Math.round(totalActual/totalPlan*100) : null;
+    const totData = ['סה"כ'];
+    if (hasPlan) totData.push(totalPlan||'—');
+    totData.push(totalActual||'—');
+    for (let i=0; i<farmCols; i++) totData.push('');
+    if (hasPlan) totData.push(totalPct!==null ? totalPct+'%' : '—');
+    const totRow = ws.addRow(totData);
+    totRow.eachCell(cell => {
+      cell.font = { bold:true, size:13, color:{argb:'FFFFFFFF'} };
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1B5E20'} };
+      cell.alignment = { horizontal:'center', vertical:'middle' };
+    });
+    totRow.height = 26;
+
+    // Column widths
+    ws.getColumn(1).width = 20;
+    let ci = 2;
+    if (hasPlan) { ws.getColumn(ci).width = 14; ci++; }
+    ws.getColumn(ci).width = 14; ci++;
+    for (let i=0; i<maxFarms; i++) {
+      ws.getColumn(ci).width = 22; ci++;
+      ws.getColumn(ci).width = 13; ci++;
+    }
+    if (hasPlan) ws.getColumn(ci).width = 12;
+
+    const buffer = await wb.xlsx.writeBuffer();
+    downloadBlob(new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+      `TikkunBitzua_${chosen}.xlsx`);
+    toast('✅ דוח הורד בהצלחה');
+  } catch(e) {
+    console.error(e);
+    alert('שגיאה: ' + e.message);
+  }
+}
+
+
+// ===============================================
+// STARTUP — runs after ALL variables & functions
+// ===============================================
+try {
+  if (settings.dark) document.body.classList.add('dark');
+  initLogoImages();
+  document.getElementById('gsUrl').value = settings.gsUrl || MASTER_URL;
+  const autoSyncSel = document.getElementById('autoSyncSelect');
+  if (autoSyncSel) autoSyncSel.value = String(settings.autoSyncMins || 0);
+  renderTemplateChips();
+  renderSettingsTemplates();
+  renderPinStatus();
+  cleanSlaughterhouseSettings();
+  populateSlaughterSelect('');
+  initPlanYearSelect();
+  initDerishotPanel();
+  startAutoSync();
+  switchTab(currentTab);
+  render();
+  if (settings.pin) showPinOverlay();
+  // Auto-pull from cloud on startup (silent, 2 sec delay)
+  setTimeout(() => {
+    const url = settings.gsUrl || MASTER_URL;
+    if (url) pullFromCloud().catch(() => {});
+  }, 2000);
+} catch (e) { console.error('Startup error', e); }
+</script>
+</body>
+</html>
