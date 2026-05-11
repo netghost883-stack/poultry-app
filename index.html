@@ -227,13 +227,11 @@ body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color
 
 <main id="planView" style="display:none; padding:0;">
 
-  <!-- Header -->
   <div style="background:linear-gradient(135deg,#1B5E20,#388E3C); padding:16px 18px; color:#fff;">
     <div style="font-size:11px; font-weight:700; opacity:0.7; letter-spacing:1px;">לוח תכנון שחיטות</div>
     <div style="font-size:20px; font-weight:800; margin-top:2px;">📋 תכנון שחיטות מול ביצוע</div>
   </div>
 
-  <!-- Controls bar -->
   <div style="background:var(--surface); padding:12px 16px; box-shadow:var(--shadow); display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
     <select id="planNavYear" onchange="planNavigate()" style="padding:8px 10px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:13px; font-weight:700;"></select>
     <select id="planNavMonth" onchange="planNavigate()" style="padding:8px 10px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:13px; font-weight:700;">
@@ -248,15 +246,12 @@ body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color
     <button onclick="exportPlanExcel()" style="margin-right:auto; padding:8px 14px; border-radius:10px; border:none; background:#217346; color:#fff; font-weight:800; font-size:12px; cursor:pointer;">📊 יצוא Excel</button>
   </div>
 
-  <!-- Plan grid -->
   <div id="planDailyGrid" style="overflow:auto; max-height:calc(100vh - 205px); padding:0 0 80px 0;"></div>
 
-  <!-- Summary bar -->
   <div id="planMonthlySummary" style="padding:12px 16px;"></div>
 
 </main>
 
-<!-- Plan cell edit modal -->
 <div id="planModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.6); align-items:flex-end; justify-content:center;">
   <div style="background:var(--surface); border-radius:20px 20px 0 0; padding:24px; width:100%; max-width:500px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -368,7 +363,7 @@ body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color
       <option value="עטרות">🏭 עטרות</option>
       <option value="מעוף 2">🏭 מעוף 2</option>
       <optgroup label="— חיצוניות —">
-        <option value="סלק אל קודס">🏭 סלק אל קודס</option>
+        <option value="מסלק אל קודס">🏭 מסלק אל קודס</option>
         <option value="חוסם (תרקומייה)">🏭 חוסם (תרקומייה)</option>
       </optgroup>
       <option value="__other__">✏️ אחר (הכנס ידנית)</option>
@@ -917,6 +912,22 @@ async function pullFromCloud() {
 
     if (document.getElementById('derishotGrid')) renderDerishotGrid();
     if (document.getElementById('planDailyGrid')) renderPlanView();
+
+    // Pull שחיטה בפועל
+    try {
+      const resShc = await fetch(url + '?type=shchita');
+      const cloudShchita = await resShc.json();
+      if (cloudShchita && typeof cloudShchita === 'object' && !Array.isArray(cloudShchita) && !cloudShchita.error) {
+        const localShc = getShchita();
+        Object.entries(cloudShchita).forEach(([date, slaughters]) => {
+          if (!localShc[date]) localShc[date] = {};
+          Object.assign(localShc[date], slaughters);
+        });
+        saveShchitaStorage(localShc);
+        if (document.getElementById('shchitaGrid')) renderShchitaGrid();
+      }
+    } catch(e_shc) {}
+
   } catch (e) {
     alert('שגיאה במשיכת נתונים מהענן:\n' + e.message);
   }
@@ -1169,6 +1180,126 @@ function sendWhatsApp() {
   return sendAnalyticsWhatsApp();
 }
 
+
+// ===============================================
+// EXPORT MONTHLY PLAN (תכנית חודשית - מטריצה)
+// ===============================================
+async function exportPlanExcel() {
+  try {
+    const plan = getPlan();
+    const slaughterhouses = getPlanSlaughterhouses(); // 'כללי' כבר כלול כאן אוטומטית
+    const year = planNavYear;
+    const month = planNavMonth;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthName = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'][month];
+
+    toast('⏳ מכין דוח תכנון חודשי...');
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(`תכנון ${monthName}`, { views: [{ rightToLeft: true, state: 'frozen', xSplit: 1, ySplit: 3 }] });
+
+    // 1. כותרת ראשית
+    ws.mergeCells(1, 1, 1, daysInMonth + 2);
+    const titleCell = ws.getCell(1,1);
+    titleCell.value = `לוח תכנון שחיטות — ${monthName} ${year}`;
+    titleCell.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getRow(1).height = 30;
+
+    // 2. שורות כותרת (ימים ותאריכים)
+    const DAYS_HE = ['א','ב','ג','ד','ה','ו','ש'];
+    const headerRowDays = ['משחטה'];
+    const headerRowDates = [''];
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(year, month, d);
+      headerRowDates.push(d); // תאריך
+      headerRowDays.push(DAYS_HE[dateObj.getDay()] + "'"); // יום בשבוע
+    }
+    headerRowDates.push('סה"כ');
+    headerRowDays.push('');
+
+    const h1 = ws.addRow(headerRowDays);
+    const h2 = ws.addRow(headerRowDates);
+
+    [h1, h2].forEach((row, idx) => {
+      row.eachCell((cell, col) => {
+        cell.font = { bold: true, size: 12 };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx === 0 ? 'FFC8E6C9' : 'FFE8F5E9' } };
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+      });
+    });
+
+    // 3. מילוי נתונים לפי משחטות
+    const monthTotalsByDay = Array(daysInMonth).fill(0);
+    let grandTotal = 0;
+
+    slaughterhouses.forEach(s => {
+      const rowData = [s];
+      let slTotal = 0;
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dk = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayPlan = normalizePlanMapForCalendar(plan[dk] || {});
+        const val = dayPlan[s] || 0;
+        
+        rowData.push(val > 0 ? val : '');
+        slTotal += val;
+        monthTotalsByDay[d-1] += val;
+      }
+      
+      rowData.push(slTotal > 0 ? slTotal : '');
+      grandTotal += slTotal;
+
+      const r = ws.addRow(rowData);
+      
+      r.eachCell((cell, col) => {
+        cell.border = { top: {style:'thin', color:{argb:'FFCFD8DC'}}, left: {style:'thin', color:{argb:'FFCFD8DC'}}, bottom: {style:'thin', color:{argb:'FFCFD8DC'}}, right: {style:'thin', color:{argb:'FFCFD8DC'}} };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        if (typeof cell.value === 'number') cell.numFmt = '#,##0';
+        
+        // צביעת עמודת השם ועמודת הסה"כ
+        if (col === 1 || col === daysInMonth + 2) {
+          cell.font = { bold: true, color: {argb: 'FF1B5E20'} };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F8F2' } };
+        }
+      });
+    });
+
+    // 4. שורת סיכום חודשית (סה"כ יומי)
+    const totalRowData = ['סה"כ יומי'];
+    monthTotalsByDay.forEach(val => totalRowData.push(val > 0 ? val : ''));
+    totalRowData.push(grandTotal);
+
+    const tRow = ws.addRow(totalRowData);
+    tRow.height = 25;
+    tRow.eachCell((cell, col) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B5E20' } };
+      cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      if (typeof cell.value === 'number') cell.numFmt = '#,##0';
+    });
+
+    // 5. סידור רוחב עמודות
+    ws.getColumn(1).width = 18; // משחטות
+    for (let c = 2; c <= daysInMonth + 1; c++) {
+      ws.getColumn(c).width = 10; // ימים
+    }
+    ws.getColumn(daysInMonth + 2).width = 14; // סה"כ
+
+    const buffer = await wb.xlsx.writeBuffer();
+    downloadBlob(new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+      `Poultry_Plan_${monthName}_${year}.xlsx`);
+    toast('✅ תכנית חודשית ירדה בהצלחה');
+
+  } catch(e) {
+    console.error(e);
+    alert('שגיאה ביצירת אקסל תכנון: ' + e.message);
+  }
+}
 
 // ===============================================
 // ANALYTICS REPORTS (STATISTICS TAB)
@@ -1888,7 +2019,7 @@ td { padding: 9px 10px; border-bottom: 1px solid #F0F0F0; font-size: 12.5px; }
         const w = window.open('', '_blank', 'width=900,height=700');
         if (!w) return toast('⚠️ אפשר פתיחת חלון חדש בדפדפן');
         w.document.open();
-        w.document.write('<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>דוח תפעולי יומי</title>' + printCSS + '</head><body>' + printBody + '</body></html>');
+        w.document.write('<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>דוח תפעולי יומי</title>' + printCSS + '</head><body>' + printBody + '\n</body></html>');
         w.document.close();
         w.focus();
         setTimeout(() => { w.print(); }, 800);
@@ -2199,8 +2330,8 @@ const DEFAULT_FARMS = [
   'בית יתיר',
   'בניה',
   'גבעת ברנר',
-  'גילת',
-  'גילת חדשה - עומר',
+  'גילת - עחי סעדון',
+  'עומר - עוזי סעדון',
   'הודיה',
   'זרועה',
   'טללים',
@@ -2273,7 +2404,7 @@ const DEFAULT_FARMS = [
   'נסלון',
   'חוות נצר דקל'
 ];
-const DEFAULT_SLAUGHTERHOUSES = ['מעוף','טרי וחלק','מישור','אשקלון','עטרות','מעוף 2','סלק אל קודס','חוסם (תרקומייה)'];
+const DEFAULT_SLAUGHTERHOUSES = ['מעוף','טרי וחלק','מישור','אשקלון','עטרות','מעוף 2','מסלק אל קודס','חוסם (תרקומייה)'];
 let derishotDate = getSafeIsoDate();
 let derishotPanelOpen = true;
 
@@ -2284,9 +2415,6 @@ function saveDerishotStorage(data) {
   localStorage.setItem('poultry_derishott', JSON.stringify(data));
 }
 
-function getDerishotSlaughterhouses() {
-  return getPlanSlaughterhouses();
-}
 
 function getPlanSlaughterhouses() {
   return uniqueNames([...DEFAULT_SLAUGHTERHOUSES, 'כללי']);
@@ -2294,8 +2422,7 @@ function getPlanSlaughterhouses() {
 
 function getPlanBucketForSlaughterhouse(name, planMap) {
   const clean = normalizeName(name);
-  if (getPlanSlaughterhouses().includes(clean)) return clean;
-  return 'כללי';
+  return clean || 'כללי';
 }
 
 function normalizePlanMapForCalendar(dayMap) {
@@ -2310,7 +2437,11 @@ function normalizePlanMapForCalendar(dayMap) {
 }
 
 function normalizeName(value) {
-  return String(value || '').trim();
+  const clean = String(value || '').trim();
+  const aliases = {
+    'סלק אל קודס': 'מסלק אל קודס'
+  };
+  return aliases[clean] || clean;
 }
 
 function uniqueNames(names) {
@@ -2390,24 +2521,23 @@ function getFarmValue() {
 
 function getAllSlaughterhouses() {
   const blocked = [
-    'כללי',
     'מעוף מעיין יסכה',
     'טרי חלק',
     'סנטרל גלאט (לנדא)',
     'עוף חברון (מישור)',
     'הדס יסכה (אשקלון)',
-    'מסלק אל קודס (חוסם משחטה)',
+    'ממסלק אל קודס (חוסם משחטה)',
     'חוסם (תרקומייה פלסטיק)'
   ];
   const fromSettings = settings.extraSlaughterhouses || [];
-  return uniqueNames([...DEFAULT_SLAUGHTERHOUSES, ...fromSettings])
+  return uniqueNames([...DEFAULT_SLAUGHTERHOUSES, 'כללי', ...fromSettings])
     .filter(name => !blocked.includes(name));
 }
 
 function rememberSlaughterhouse(name) {
   const clean = normalizeName(name);
   if (!clean || clean === 'כללי' || DEFAULT_SLAUGHTERHOUSES.includes(clean)) return;
-  if (['מעוף מעיין יסכה','טרי חלק','סנטרל גלאט (לנדא)','עוף חברון (מישור)','הדס יסכה (אשקלון)','מסלק אל קודס (חוסם משחטה)','חוסם (תרקומייה פלסטיק)'].includes(clean)) return;
+  if (['מעוף מעיין יסכה','טרי חלק','סנטרל גלאט (לנדא)','עוף חברון (מישור)','הדס יסכה (אשקלון)','ממסלק אל קודס (חוסם משחטה)','חוסם (תרקומייה פלסטיק)'].includes(clean)) return;
   const extra = uniqueNames(settings.extraSlaughterhouses || []);
   if (!extra.includes(clean)) {
     settings.extraSlaughterhouses = [...extra, clean];
@@ -2468,7 +2598,7 @@ function renderDerishotGrid() {
 
   const derishott = getDerishott();
   const dayData = derishott[derishotDate] || {};
-  const slaughterhouses = getDerishotSlaughterhouses();
+  const slaughterhouses = getPlanSlaughterhouses();
 
   // Get actual quantities for this date from records
   const actualMap = {};
@@ -2492,7 +2622,7 @@ function renderDerishotGrid() {
 
     return `<div style="border:1px solid ${isKlali ? 'rgba(0,0,0,0.08)' : 'var(--border)'}; border-radius:14px; padding:12px 14px; margin-bottom:10px; background:${isKlali ? 'rgba(0,0,0,0.02)' : 'var(--background)'};">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div style="font-weight:800; font-size:14px; color:var(--primary);">${isKlali ? '🔲 כללי (אופציונלי)' : '🏭 ' + escapeHtml(s)}</div>
+        <div style="font-weight:800; font-size:14px; color:var(--primary);">🏭 ${escapeHtml(s)}</div>
         <div style="font-size:11px; color:var(--text-secondary);">בפועל: <b style="color:${actual > 0 ? '#1B5E20' : '#bbb'};">${actual > 0 ? formatNumber(actual) : '—'}</b></div>
       </div>
       <div style="display:flex; gap:8px; align-items:center;">
@@ -2512,7 +2642,7 @@ function renderDerishotGrid() {
 }
 
 function saveDerishott() {
-  const slaughterhouses = getDerishotSlaughterhouses();
+  const slaughterhouses = getPlanSlaughterhouses();
   const derishott = getDerishott();
   if (!derishott[derishotDate]) derishott[derishotDate] = {};
 
@@ -2557,6 +2687,158 @@ function initDerishotPanel() {
   derishotDate = getSafeIsoDate();
   renderDerishotGrid();
 }
+// ===============================================
+// ACTUAL SLAUGHTER DATA (שחיטה בפועל)
+// ===============================================
+let shchitaDate = getSafeIsoDate();
+
+function getShchita() {
+  try { return JSON.parse(localStorage.getItem('poultry_shchita') || '{}'); } catch { return {}; }
+}
+function saveShchitaStorage(data) {
+  localStorage.setItem('poultry_shchita', JSON.stringify(data));
+}
+
+function getShchitaSlaughterhouses() {
+  const external = ['מסלק אל קודס', 'חוסם (תרקומייה)'];
+  return getPlanSlaughterhouses().filter(s => !external.includes(s));
+}
+
+// ── Modal open/close ─────────────────────────────────
+function openShchitaModal() {
+  shchitaDate = getSafeIsoDate();
+  const modal = document.getElementById('shchitaModal');
+  if (modal) { modal.style.display = 'flex'; renderShchitaGrid(); }
+}
+function closeShchitaModal() {
+  const modal = document.getElementById('shchitaModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function changeShchitaDate(val) {
+  if (!val) return;
+  shchitaDate = val;
+  renderShchitaGrid();
+}
+
+// ── Render inputs inside modal ───────────────────────
+function renderShchitaGrid() {
+  const grid      = document.getElementById('shchitaGrid');
+  const dateInput = document.getElementById('shchitaDateInput');
+  if (!grid) return;
+  if (dateInput) dateInput.value = shchitaDate;
+
+  const shchita = getShchita();
+  const dayData = shchita[shchitaDate] || {};
+  const slaughterhouses = getShchitaSlaughterhouses();
+
+  // Get planned/demand numbers for comparison bars
+  const derishotDay = (getDerishott()[shchitaDate]) || {};
+  const planDay     = normalizePlanMapForCalendar((getPlan()[shchitaDate]) || {});
+
+  grid.innerHTML = slaughterhouses.map(s => {
+    const actual = dayData[s] || 0;
+    const demand = derishotDay[s] || planDay[s] || 0;
+    const pct    = demand > 0 ? Math.round(actual / demand * 100) : null;
+    const barCol = pct === null ? '#90CAF9'
+                 : pct >= 100  ? '#2E7D32'
+                 : pct >= 70   ? '#F9A825'
+                 : '#E53935';
+    const barW   = demand > 0 ? Math.min(100, pct) : 0;
+    const safeId = 'shc_' + s.replace(/[^a-zA-Z֐-׿0-9]/g, '_');
+
+    return `<div style="border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin-bottom:10px; background:var(--surface);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:800; font-size:14px; color:#1565C0;">🏭 ${escapeHtml(s)}</div>
+        ${demand > 0 ? `<div style="font-size:11px; color:var(--text-secondary);">יעד: <b>${formatNumber(demand)}</b></div>` : ''}
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="number" inputmode="numeric" id="${safeId}"
+          value="${actual || ''}" placeholder="הכנס כמות..."
+          style="flex:1; padding:11px 12px; border-radius:10px; border:2px solid #BBDEFB;
+                 background:var(--surface); color:var(--text); font-size:17px; font-weight:800; text-align:center;"
+          oninput="refreshShchitaBar('${safeId}',${demand})">
+        <div id="${safeId}_pct" style="font-size:13px; font-weight:800; color:${barCol}; min-width:42px; text-align:center;">
+          ${pct !== null ? pct + '%' : ''}
+        </div>
+      </div>
+      ${actual > 0 && demand > 0
+        ? `<div style="margin-top:8px; background:#eee; border-radius:20px; height:6px; overflow:hidden;">
+             <div id="${safeId}_bar" style="background:${barCol}; height:100%; width:${barW}%; border-radius:20px; transition:width 0.3s;"></div>
+           </div>`
+        : `<div style="margin-top:8px; background:#eee; border-radius:20px; height:6px; overflow:hidden;">
+             <div id="${safeId}_bar" style="background:#90CAF9; height:100%; width:0%; border-radius:20px; transition:width 0.3s;"></div>
+           </div>`}
+    </div>`;
+  }).join('') || '<div style="text-align:center;padding:20px;color:var(--text-secondary);">אין משחטות</div>';
+}
+
+function refreshShchitaBar(safeId, demand) {
+  const inp  = document.getElementById(safeId);
+  const bar  = document.getElementById(safeId + '_bar');
+  const pctEl = document.getElementById(safeId + '_pct');
+  if (!inp || !bar || !pctEl) return;
+  const actual = Number(inp.value) || 0;
+  const pct    = demand > 0 ? Math.round(actual / demand * 100) : null;
+  const barCol = pct === null ? '#90CAF9' : pct >= 100 ? '#2E7D32' : pct >= 70 ? '#F9A825' : '#E53935';
+  bar.style.width = (demand > 0 ? Math.min(100, pct) : 0) + '%';
+  bar.style.background = barCol;
+  pctEl.style.color = barCol;
+  pctEl.textContent = pct !== null ? pct + '%' : '';
+}
+
+// ── Save ─────────────────────────────────────────────
+function saveShchitaData() {
+  const slaughterhouses = getShchitaSlaughterhouses();
+  const shchita = getShchita();
+  if (!shchita[shchitaDate]) shchita[shchitaDate] = {};
+
+  const dayData = {};
+  slaughterhouses.forEach(s => {
+    const safeId = 'shc_' + s.replace(/[^a-zA-Z֐-׿0-9]/g, '_');
+    const inp = document.getElementById(safeId);
+    const val = inp ? Number(inp.value) || 0 : 0;
+    if (val > 0) { shchita[shchitaDate][s] = val; dayData[s] = val; }
+    else delete shchita[shchitaDate][s];
+  });
+  if (Object.keys(shchita[shchitaDate]).length === 0) delete shchita[shchitaDate];
+
+  saveShchitaStorage(shchita);
+  closeShchitaModal();
+  toast('✅ שחיטה בפועל נשמרה — ' + shchitaDate.split('-').reverse().join('.'));
+
+  // Sync to Google Sheets
+  const url = document.getElementById('gsUrl')?.value || settings.gsUrl || MASTER_URL;
+  if (url) {
+    fetch(url, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({ type: 'shchita', date: shchitaDate, shchita: dayData })
+    }).catch(() => {});
+  }
+}
+
+function copyShchitaFromYesterday() {
+  const yesterday = new Date(shchitaDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yKey = getDateKey(yesterday);
+  const shchita = getShchita();
+  const yData = shchita[yKey];
+  if (!yData || !Object.keys(yData).length) {
+    toast('⚠️ אין נתוני שחיטה מאתמול'); return;
+  }
+  shchita[shchitaDate] = { ...yData };
+  saveShchitaStorage(shchita);
+  renderShchitaGrid();
+  toast('📋 הועתק מ-' + yKey.split('-').reverse().join('.'));
+}
+
+function initShchitaPanel() {
+  // Show the FAB button
+  const fab = document.getElementById('shchitaFab');
+  if (fab) fab.style.display = 'flex';
+}
+
+
 
 const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 let planEditCtx = null;
@@ -2826,6 +3108,9 @@ async function exportPlanVsActualExcel() {
       });
     });
 
+    // 1b. Load actual slaughter data
+    const shchitaDayData = normalizePlanMapForCalendar(getShchita()[chosen] || {});
+
     // 2. Plan source
     let planMap = {};
     const localDerishott = getDerishott();
@@ -2850,11 +3135,13 @@ async function exportPlanVsActualExcel() {
     });
 
     // 3. Active slaughterhouses (have plan or actual)
+    const forceShow = ['מסלק אל קודס', 'חוסם (תרקומייה)'];
     const activeSlaughters = [...new Set([
       ...getPlanSlaughterhouses(),
       ...Object.keys(bySlaughter),
-      ...Object.keys(planMap)
-    ])].filter(s => (planMap[s] || 0) > 0 || (bySlaughter[s] || 0) > 0);
+      ...Object.keys(planMap),
+      ...Object.keys(shchitaDayData || {})
+    ])].filter(s => (planMap[s] || 0) > 0 || (bySlaughter[s] || 0) > 0 || (shchitaDayData[s] || 0) > 0 || forceShow.includes(s));
 
     // 4. Max farms across all slaughterhouses
     const farmsPerSlaughter = {};
@@ -2867,9 +3154,9 @@ async function exportPlanVsActualExcel() {
     // A: משחטה | B: תכנון (if hasPlan) | C: ביצוע בפועל
     // then pairs: שם חווה + כמות עופות  x maxFarms
     // last: אחוז ביצוע (if hasPlan)
-    const fixedLeft = hasPlan ? 3 : 2;   // משחטה + [תכנון] + ביצוע
+    const fixedLeft = hasPlan ? 4 : 3;   // משחטה + [תכנון] + ביצוע שיווק + שחיטה בפועל
     const farmCols  = maxFarms * 2;       // name+qty per farm
-    const fixedRight = hasPlan ? 1 : 0;  // אחוז
+    const fixedRight = 0;  // אחוז ביצוע הוסר
     const totalCols = fixedLeft + farmCols + fixedRight;
 
     const wb = new ExcelJS.Workbook();
@@ -2904,57 +3191,73 @@ async function exportPlanVsActualExcel() {
     // Row 4: Column headers
     const hData = ['משחטה'];
     if (hasPlan) hData.push('תכנון');
-    hData.push('ביצוע בפועל');
+    hData.push('ביצוע שיווק');
+    hData.push('שחיטה בפועל');
     for (let i = 0; i < maxFarms; i++) { hData.push('שם חווה'); hData.push('כמות עופות'); }
-    if (hasPlan) hData.push('אחוז ביצוע');
+    // אחוז ביצוע הוסר
+    const shchitaColIdx = hasPlan ? 4 : 3; // column index (1-based) of שחיטה בפועל
     const hRow = ws.addRow(hData); // row 4
     hRow.eachCell((cell, col) => {
       cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:11 };
-      // Farm cols get lighter green
       const isFarmCol = col >= fixedLeft+1 && col <= fixedLeft+farmCols;
-      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: isFarmCol ? 'FF66BB6A' : 'FF2E7D32'} };
+      const isShchitaCol = col === shchitaColIdx;
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: isFarmCol ? 'FF66BB6A' : isShchitaCol ? 'FF1565C0' : 'FF2E7D32'} };
       cell.alignment = { horizontal:'center', vertical:'middle' };
     });
     ws.getRow(4).height = 24;
 
-    let totalPlan = 0, totalActual = 0;
+    let totalPlan = 0, totalActual = 0, totalShchita = 0;
 
     activeSlaughters.forEach((s, idx) => {
-      const planned = planMap[s] || 0;
-      const actual  = bySlaughter[s] || 0;
-      if (planned === 0 && actual === 0) return;
-      totalPlan   += planned;
-      totalActual += actual;
+      const planned  = planMap[s] || 0;
+      const actual   = bySlaughter[s] || 0;
+      let shchitaQ = shchitaDayData[s] || 0;
+
+      // במשחטות חיצוניות השחיטה בפועל שווה אוטומטית לביצוע השיווק
+      if (s === 'מסלק אל קודס' || s === 'חוסם (תרקומייה)') {
+        shchitaQ = actual;
+      }
+
+      if (planned === 0 && actual === 0 && shchitaQ === 0 && !forceShow.includes(s)) return;
+
+      totalPlan    += planned;
+      totalActual  += actual;
+      totalShchita += shchitaQ;
       const pct = planned > 0 ? Math.round(actual/planned*100) : null;
+      const shPct = planned > 0 && shchitaQ > 0 ? Math.round(shchitaQ/planned*100) : null;
       const farms = farmsPerSlaughter[s] || [];
-      const isExternal = s === 'סלק אל קודס' || s === 'חוסם (תרקומייה)' || s === 'כללי';
+      const isExternal = s === 'מסלק אל קודס' || s === 'חוסם (תרקומייה)';
       const rowBg  = idx % 2 === 0 ? 'FFFAFAFA' : 'FFFFFFFF';
       const farmBg = isExternal ? 'FFFFF3E0' : 'FFF1F8E9';
 
       const rowData = [s];
       if (hasPlan) rowData.push(planned || '—');
       rowData.push(actual || '—');
+      rowData.push(shchitaQ > 0 ? shchitaQ : '—');   // שחיטה בפועל
       for (let i = 0; i < maxFarms; i++) {
         rowData.push(i < farms.length ? farms[i][0] : '');
         rowData.push(i < farms.length ? farms[i][1] : '');
       }
-      if (hasPlan) rowData.push(pct !== null ? pct+'%' : '—');
+      // אחוז ביצוע הוסר מהשורות
 
       const row = ws.addRow(rowData);
       row.height = 22;
       row.eachCell((cell, col) => {
         const isFarmCol = col >= fixedLeft+1 && col <= fixedLeft+farmCols;
+        const isShcCol  = col === shchitaColIdx;
         cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: isFarmCol ? farmBg : rowBg} };
         cell.alignment = { horizontal:'center', vertical:'middle' };
-        // Farm name cols bold
         if (isFarmCol && col % 2 === (fixedLeft+1) % 2) cell.font = { bold:true, size:11 };
+        if (isShcCol && shchitaQ > 0) {
+          const shcColor = shPct === null ? 'FF1565C0' : shPct>=100 ? 'FF1B5E20' : shPct>=70 ? 'FFF57F17' : 'FFC62828';
+          cell.font = { bold:true, color:{argb:shcColor} };
+          cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE3F2FD'} };
+        }
       });
       row.getCell(1).alignment = { horizontal:'right' };
-      row.getCell(1).font = { bold:true };
-      if (hasPlan && pct !== null) {
-        const col = pct>=100 ? 'FF1B5E20' : pct>=70 ? 'FFF57F17' : 'FFC62828';
-        row.getCell(totalCols).font = { bold:true, color:{argb:col} };
-      }
+      const isRedText = s === 'מסלק אל קודס';
+      row.getCell(1).font = { bold:true, color: isRedText ? {argb:'FFFF0000'} : undefined };
+      // אחוז ביצוע הוסר
     });
 
     // Totals
@@ -2963,12 +3266,13 @@ async function exportPlanVsActualExcel() {
     const totData = ['סה"כ'];
     if (hasPlan) totData.push(totalPlan||'—');
     totData.push(totalActual||'—');
+    totData.push(totalShchita > 0 ? totalShchita : '—');  // שחיטה בפועל total
     for (let i=0; i<farmCols; i++) totData.push('');
-    if (hasPlan) totData.push(totalPct!==null ? totalPct+'%' : '—');
+    // אחוז ביצוע הוסר מהסיכום
     const totRow = ws.addRow(totData);
-    totRow.eachCell(cell => {
+    totRow.eachCell((cell, col) => {
       cell.font = { bold:true, size:13, color:{argb:'FFFFFFFF'} };
-      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1B5E20'} };
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: col === shchitaColIdx ? 'FF1565C0' : 'FF1B5E20'} };
       cell.alignment = { horizontal:'center', vertical:'middle' };
     });
     totRow.height = 26;
@@ -2977,12 +3281,13 @@ async function exportPlanVsActualExcel() {
     ws.getColumn(1).width = 20;
     let ci = 2;
     if (hasPlan) { ws.getColumn(ci).width = 14; ci++; }
-    ws.getColumn(ci).width = 14; ci++;
+    ws.getColumn(ci).width = 14; ci++;  // ביצוע שיווק
+    ws.getColumn(ci).width = 14; ci++;  // שחיטה בפועל
     for (let i=0; i<maxFarms; i++) {
       ws.getColumn(ci).width = 22; ci++;
       ws.getColumn(ci).width = 13; ci++;
     }
-    if (hasPlan) ws.getColumn(ci).width = 12;
+    // אחוז ביצוע — עמודה הוסרה
 
     const buffer = await wb.xlsx.writeBuffer();
     downloadBlob(new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
@@ -3011,6 +3316,7 @@ try {
   populateSlaughterSelect('');
   initPlanYearSelect();
   initDerishotPanel();
+  initShchitaPanel();
   startAutoSync();
   switchTab(currentTab);
   render();
@@ -3022,5 +3328,53 @@ try {
   }, 2000);
 } catch (e) { console.error('Startup error', e); }
 </script>
+
+
+<div id="shchitaModal" style="display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,0.65); align-items:flex-end; justify-content:center;" onclick="if(event.target===this)closeShchitaModal()">
+  <div style="background:var(--surface); width:100%; max-width:480px; border-radius:24px 24px 0 0; padding:0 0 env(safe-area-inset-bottom,0) 0; max-height:90vh; display:flex; flex-direction:column;">
+
+    <div style="background:linear-gradient(135deg,#1565C0,#1976D2); padding:18px 20px 16px; border-radius:24px 24px 0 0; flex-shrink:0;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:11px; color:rgba(255,255,255,0.7); font-weight:700; letter-spacing:1px;">ביצוע שחיטה</div>
+          <div style="font-size:19px; font-weight:800; color:#fff; margin-top:3px;">✅ שחיטה בפועל</div>
+        </div>
+        <button onclick="closeShchitaModal()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; font-size:18px; font-weight:700; border-radius:50%; width:36px; height:36px; cursor:pointer; line-height:1;">✕</button>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:14px; align-items:center;">
+        <input type="date" id="shchitaDateInput"
+          onchange="changeShchitaDate(this.value)"
+          style="flex:1; padding:9px 12px; border-radius:10px; border:none; background:rgba(255,255,255,0.2); color:#fff; font-size:14px; font-weight:700; color-scheme:dark;">
+        <button onclick="copyShchitaFromYesterday()"
+          style="padding:9px 13px; border-radius:10px; border:none; background:rgba(255,255,255,0.2); color:#fff; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">
+          📋 אתמול
+        </button>
+      </div>
+    </div>
+
+    <div style="overflow-y:auto; padding:16px 16px 4px; flex:1;">
+      <div id="shchitaGrid"></div>
+    </div>
+
+    <div style="padding:12px 16px 20px; flex-shrink:0;">
+      <button onclick="saveShchitaData()"
+        style="width:100%; padding:15px; border-radius:16px; border:none; background:linear-gradient(90deg,#1565C0,#1976D2); color:#fff; font-size:16px; font-weight:800; cursor:pointer; box-shadow:0 4px 14px rgba(21,101,192,0.4);">
+        💾 שמור שחיטה בפועל
+      </button>
+    </div>
+  </div>
+</div>
+
+<button id="shchitaFab"
+  onclick="openShchitaModal()"
+  style="display:none; position:fixed; bottom:80px; left:16px; z-index:900;
+         background:linear-gradient(135deg,#1565C0,#1976D2);
+         color:#fff; border:none; border-radius:50px;
+         padding:13px 18px; font-size:13px; font-weight:800;
+         box-shadow:0 4px 16px rgba(21,101,192,0.5);
+         cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:7px;">
+  ✅ שחיטה בפועל
+</button>
+
 </body>
 </html>
