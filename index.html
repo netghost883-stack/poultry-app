@@ -501,8 +501,8 @@ const AUTH_USERS = [
 ];
 const ROLE_TABS = {
   admin: ['home', 'history', 'statistics', 'reports', 'plan', 'settings'],
-  operator: ['home', 'history', 'reports'],
-  viewer: ['home', 'history', 'statistics']
+  operator: ['home', 'history', 'reports', 'plan'],
+  viewer: ['home', 'history', 'statistics', 'plan']
 };
 const ROLE_PERMISSIONS = {
   admin: ['shivukimWrite', 'shivukimDelete', 'dailyReportExport', 'analyticsExport', 'planWrite', 'settingsWrite', 'backupRestore', 'whatsapp'],
@@ -598,7 +598,18 @@ function applyAccessControl() {
   hideButtons(['exportDailyExcel', 'exportDailyPDF'], can('dailyReportExport'));
   hideButtons(['exportExcel', 'exportPDF'], can('dailyReportExport') || can('analyticsExport'));
   hideButtons(['exportAnalyticsExcel', 'exportAnalyticsPDF', 'sendAnalyticsWhatsApp', 'exportPeriodExcel'], can('analyticsExport'));
-  hideButtons(['exportPlanExcel', 'exportPlanVsActualExcel', 'savePlanTarget', 'clearPlanTarget'], can('planWrite'));
+  hideButtons([
+    'exportPlanExcel',
+    'exportPlanVsActualExcel',
+    'openPlanModal',
+    'savePlanTarget',
+    'clearPlanTarget',
+    'saveDerishott',
+    'copyDerishotFromYesterday',
+    'openShchitaModal',
+    'saveShchitaData',
+    'copyShchitaFromYesterday'
+  ], can('planWrite'));
   hideButtons(['saveGsUrl', 'saveAutoSync', 'setPin', 'clearPin', 'backupData', 'restoreFile'], can('settingsWrite'));
   const badge = document.getElementById('userBadge');
   if (badge) badge.textContent = currentUser ? currentUser.label : 'Login';
@@ -3099,7 +3110,7 @@ function copyShchitaFromYesterday() {
 function initShchitaPanel() {
   // Show the FAB button
   const fab = document.getElementById('shchitaFab');
-  if (fab) fab.style.display = 'flex';
+  if (fab) fab.style.display = can('planWrite') ? 'flex' : 'none';
 }
 
 
