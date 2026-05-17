@@ -447,7 +447,7 @@ function initLogoImages() {
     headerLogo.src = LOGO_DATA_URL;
   }
 }
-const MASTER_URL = 'https://script.google.com/macros/s/AKfycbzwWZneN0iijypOQleEWa3DgTuyNx3Bux_AndUzF4DvmGrOzRW2b7morWf7IVVB8NVycw/exec';
+const MASTER_URL = 'https://script.google.com/macros/s/AKfycbxfe0YOcEjXd3_aQJXpxPIJX6NRwd6leZ6HBaHJpwHER7kM2gt2cCyi6HlJjnZwjWYAVA/exec';
 const TAB_NAMES = ['home', 'history', 'statistics', 'reports', 'plan', 'settings'];
 const PERIOD_OPTIONS = [
   { key: 'day', label: 'היום' },
@@ -496,13 +496,13 @@ async function fetchCloudJson(url) {
 
 const AUTH_USERS = [
   { username: 'admin', password: '3216', role: 'admin', label: 'Admin' },
-  { username: 'Roi', password: '1234', role: 'operator', label: 'Shivukim' },
-  { username: 'gest', password: '1111', role: 'viewer', label: 'View only' }
+  { username: 'Roi', password: '2222', role: 'operator', label: 'Shivukim' },
+  { username: 'viewer', password: '3333', role: 'viewer', label: 'View only' }
 ];
 const ROLE_TABS = {
   admin: ['home', 'history', 'statistics', 'reports', 'plan', 'settings'],
-  operator: ['home', 'history', 'reports', 'plan'],
-  viewer: ['home', 'history', 'statistics', 'plan']
+  operator: ['home', 'history', 'reports'],
+  viewer: ['home', 'history', 'statistics']
 };
 const ROLE_PERMISSIONS = {
   admin: ['shivukimWrite', 'shivukimDelete', 'dailyReportExport', 'analyticsExport', 'planWrite', 'settingsWrite', 'backupRestore', 'whatsapp'],
@@ -598,18 +598,7 @@ function applyAccessControl() {
   hideButtons(['exportDailyExcel', 'exportDailyPDF'], can('dailyReportExport'));
   hideButtons(['exportExcel', 'exportPDF'], can('dailyReportExport') || can('analyticsExport'));
   hideButtons(['exportAnalyticsExcel', 'exportAnalyticsPDF', 'sendAnalyticsWhatsApp', 'exportPeriodExcel'], can('analyticsExport'));
-  hideButtons([
-    'exportPlanExcel',
-    'exportPlanVsActualExcel',
-    'openPlanModal',
-    'savePlanTarget',
-    'clearPlanTarget',
-    'saveDerishott',
-    'copyDerishotFromYesterday',
-    'openShchitaModal',
-    'saveShchitaData',
-    'copyShchitaFromYesterday'
-  ], can('planWrite'));
+  hideButtons(['exportPlanExcel', 'exportPlanVsActualExcel', 'savePlanTarget', 'clearPlanTarget'], can('planWrite'));
   hideButtons(['saveGsUrl', 'saveAutoSync', 'setPin', 'clearPin', 'backupData', 'restoreFile'], can('settingsWrite'));
   const badge = document.getElementById('userBadge');
   if (badge) badge.textContent = currentUser ? currentUser.label : 'Login';
@@ -1067,8 +1056,12 @@ async function pullFromCloud() {
       const resD = await fetch(url + '?type=derishott');
       const cloudDerishott = await resD.json();
       if (cloudDerishott && typeof cloudDerishott === 'object' && !Array.isArray(cloudDerishott) && !cloudDerishott.error) {
-        const merged = { ...getDerishott(), ...cloudDerishott };
-        saveDerishotStorage(merged);
+        const lo = getDerishott();
+        Object.entries(cloudDerishott).forEach(([dt, sl]) => {
+          if (!lo[dt]) lo[dt] = {};
+          Object.assign(lo[dt], sl);
+        });
+        saveDerishotStorage(lo);
       }
     } catch(e3) {}
 
@@ -3110,7 +3103,7 @@ function copyShchitaFromYesterday() {
 function initShchitaPanel() {
   // Show the FAB button
   const fab = document.getElementById('shchitaFab');
-  if (fab) fab.style.display = can('planWrite') ? 'flex' : 'none';
+  if (fab) fab.style.display = 'flex';
 }
 
 
@@ -3296,8 +3289,8 @@ function renderPlanView() {
       return `<td style="padding:2px 3px; text-align:center; background:${bg}; cursor:pointer; border-left:1px solid #eee;" onclick="openPlanModal('${dk}','${s}')">
         ${target ? `<div style="font-size:12px; font-weight:800; color:#1B5E20;">${(target/1000).toFixed(1)}k</div>` : `<div style="font-size:11px; color:#ccc;">—</div>`}
         ${shchita ? `<div style="font-size:10px; color:#1565C0; font-weight:800;" title="שחיטה בפועל">✅ ${(shchita/1000).toFixed(1)}k</div>` : ''}
-        ${actual && !shchita ? `<div style="font-size:10px; color:${col}; font-weight:700;">${(actual/1000).toFixed(1)}k</div>` : ''}
-        ${actual && shchita ? `<div style="font-size:9px; color:#888; font-weight:600;" title="שיווק">${(actual/1000).toFixed(1)}k</div>` : ''}
+        ${actual && !shchita && target ? `<div style="font-size:10px; color:${col}; font-weight:700;" title="שיווקים">${(actual/1000).toFixed(1)}k</div>` : ''}
+        ${actual && shchita && target ? `<div style="font-size:9px; color:#888; font-weight:600;" title="שיווק">${(actual/1000).toFixed(1)}k</div>` : ''}
       </td>`;
     }).join('');
 
@@ -3845,7 +3838,7 @@ async function exportPeriodExcel() {
         // שחיטה בפועל
         try{const r=await fetch(gsUrl+'?type=shchita');const d=await r.json();if(d&&!Array.isArray(d)&&!d.error){const lo=getShchita();Object.entries(d).forEach(([dt,sl])=>{if(!lo[dt])lo[dt]={};Object.assign(lo[dt],sl);});saveShchitaStorage(lo);}}catch(e){}
         // תכנון + דרישות
-        try{const r=await fetch(gsUrl+'?type=derishott');const d=await r.json();if(d&&!Array.isArray(d)&&!d.error){saveDerishotStorage({...getDerishott(),...d});}}catch(e){}
+        try{const r=await fetch(gsUrl+'?type=derishott');const d=await r.json();if(d&&!Array.isArray(d)&&!d.error){const lo=getDerishott();Object.entries(d).forEach(([dt,sl])=>{if(!lo[dt])lo[dt]={};Object.assign(lo[dt],sl);});saveDerishotStorage(lo);}}catch(e){}
         try{const r=await fetch(gsUrl+'?type=tochnit');const d=await r.json();if(d&&!Array.isArray(d)&&!d.error){const lo=getPlan();Object.entries(d).forEach(([dt,sl])=>{if(!lo[dt])lo[dt]={};Object.assign(lo[dt],sl);});savePlan(lo);}}catch(e){}
       } catch(e) {}
     }
@@ -4108,7 +4101,7 @@ try {
       }
       // דרישות
       showCloudOverlay('טוען דרישות יומיות...');
-      try { const r=await fetch(url+'?type=derishott'); const d=await r.json(); if(d&&!Array.isArray(d)&&!d.error){ const m={...getDerishott(),...d}; saveDerishotStorage(m); } } catch(e){}
+      try { const r=await fetch(url+'?type=derishott'); const d=await r.json(); if(d&&!Array.isArray(d)&&!d.error){ const lo=getDerishott(); Object.entries(d).forEach(([dt,sl])=>{ if(!lo[dt]) lo[dt]={}; Object.assign(lo[dt],sl); }); saveDerishotStorage(lo); } } catch(e){}
       // תכנון
       try { const r=await fetch(url+'?type=tochnit'); const d=await r.json(); if(d&&!Array.isArray(d)&&!d.error){ const lo=getPlan(); Object.entries(d).forEach(([dt,sl])=>{ if(!lo[dt]) lo[dt]={}; Object.assign(lo[dt],sl); }); savePlan(lo); } } catch(e){}
       // שחיטה בפועל
