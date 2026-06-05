@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="no-referrer">
 <title>ניהול שווקים של יסכה רפאל</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -268,6 +270,7 @@ body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color
     <button onclick="planPrevMonth()" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:none; color:var(--text); font-weight:800; cursor:pointer;">◀</button>
     <button onclick="planNextMonth()" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:none; color:var(--text); font-weight:800; cursor:pointer;">▶</button>
     <button onclick="planToday()" style="padding:8px 12px; border-radius:10px; border:none; background:#E8F5E9; color:#1B5E20; font-weight:800; font-size:12px; cursor:pointer;">היום</button>
+    <button onclick="openShchitaModal()" style="padding:8px 14px; border-radius:10px; border:none; background:#1565C0; color:#fff; font-weight:800; font-size:12px; cursor:pointer;">✅ שחיטה בפועל</button>
     <button onclick="exportPlanExcel()" style="margin-right:auto; padding:8px 14px; border-radius:10px; border:none; background:#217346; color:#fff; font-weight:800; font-size:12px; cursor:pointer;">📊 יצוא Excel</button>
   </div>
 
@@ -284,6 +287,7 @@ body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color
       <button onclick="closePlanModal()" style="border:none; background:none; font-size:24px; cursor:pointer;">✕</button>
     </div>
     <div id="planModalSub" style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;"></div>
+    <div id="planHolidaySection" style="margin-bottom:4px;"></div>
     <label style="font-size:12px; font-weight:700; display:block; margin-bottom:8px;">יעד דרישה (כמות עופות)</label>
     <input id="planTargetInput" type="number" inputmode="numeric" placeholder="הכנס כמות..."
       style="width:100%; padding:16px; border-radius:12px; border:2px solid var(--border); background:var(--surface); color:var(--text); font-size:22px; font-weight:800; text-align:center; margin-bottom:8px;">
@@ -494,26 +498,66 @@ async function fetchCloudJson(url) {
   }
 }
 
+// Passwords stored as SHA-256 hashes (never plaintext)
 const AUTH_USERS = [
-  { username: 'admin', password: '3216', role: 'admin', label: 'Admin' },
-  { username: 'Roi', password: '2222', role: 'operator', label: 'Shivukim' },
-  { username: 'viewer', password: '3333', role: 'viewer', label: 'View only' }
+  { username: 'admin',  passwordHash: '7b31c40281e40541b60824340375dc4d70b2b8da0ec6c73a0f136a3d13173cf4', role: 'admin',    label: 'Admin' },
+  { username: 'Roi',    passwordHash: 'edee29f882543b956620b26d0ee0e7e950399b1c4222f5de05e06425b4c995e9', role: 'operator', label: 'Shivukim' },
+  { username: 'Sason',  passwordHash: '40f8cf02199b4981a3eccd39cf05e0a98dd5860ad8c5bcff2f7d602412b59989', role: 'manager',  label: 'Sason' },
+  { username: 'guest',  passwordHash: '318aee3fed8c9d040d35a7fc1fa776fb31303833aa2de885354ddf3d44d8fb69', role: 'guest',    label: 'Guest' }
 ];
+
+// Brute-force protection: persist failed login attempts across reloads.
+const LOGIN_LOCK_KEY = 'poultry_login_lock';
+function _loadLoginState() {
+  try {
+    const state = JSON.parse(localStorage.getItem(LOGIN_LOCK_KEY) || '{}');
+    return { fails: Number(state.fails) || 0, lockedUntil: Number(state.lockedUntil) || 0 };
+  } catch (e) {
+    return { fails: 0, lockedUntil: 0 };
+  }
+}
+function _saveLoginState(state) {
+  try { localStorage.setItem(LOGIN_LOCK_KEY, JSON.stringify(state)); } catch (e) {}
+}
+const _loginState = _loadLoginState();
+
+async function _sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Session auto-logout after 30 min inactivity
+let _sessionTimer = null;
+function _resetSessionTimer() {
+  clearTimeout(_sessionTimer);
+  if (!currentUser) return;
+  _sessionTimer = setTimeout(() => {
+    if (currentUser) { logoutUser(); toast('⏳ Сессия истекла — выполнен автовыход'); }
+  }, 30 * 60 * 1000);
+}
+['click','keydown','touchstart','mousemove'].forEach(ev =>
+  document.addEventListener(ev, _resetSessionTimer, { passive: true })
+);
 const ROLE_TABS = {
   admin: ['home', 'history', 'statistics', 'reports', 'plan', 'settings'],
-  operator: ['home', 'history', 'reports'],
-  viewer: ['home', 'history', 'statistics']
+  operator: ['home', 'history', 'reports', 'plan'],
+  manager: ['home', 'history', 'statistics', 'reports', 'plan'],
+  guest: ['home', 'history', 'statistics', 'plan']
 };
 const ROLE_PERMISSIONS = {
-  admin: ['shivukimWrite', 'shivukimDelete', 'dailyReportExport', 'analyticsExport', 'planWrite', 'settingsWrite', 'backupRestore', 'whatsapp'],
+  admin: ['shivukimWrite', 'shivukimDelete', 'dailyReportExport', 'analyticsExport', 'planWrite', 'shchitaWrite', 'settingsWrite', 'backupRestore', 'whatsapp'],
   operator: ['shivukimWrite', 'shivukimDelete', 'dailyReportExport', 'whatsapp'],
-  viewer: []
+  manager: ['dailyReportExport', 'analyticsExport', 'planWrite', 'whatsapp'],
+  guest: []
 };
+// Freeze security-critical constants against runtime prototype pollution / tampering
+Object.freeze(AUTH_USERS); AUTH_USERS.forEach(u => Object.freeze(u));
+Object.freeze(ROLE_PERMISSIONS); Object.freeze(ROLE_TABS);
 let currentUser = null;
 
 function loadAuthUser() {
   try {
-    const saved = JSON.parse(localStorage.getItem('poultry_auth_user') || 'null');
+    const saved = JSON.parse(sessionStorage.getItem('poultry_auth_user') || localStorage.getItem('poultry_auth_user') || 'null');
     if (!saved) return null;
     const known = AUTH_USERS.find(user => user.username === saved.username && user.role === saved.role);
     return known ? { username: known.username, role: known.role, label: known.label } : null;
@@ -523,7 +567,8 @@ function loadAuthUser() {
 }
 
 function saveAuthUser(user) {
-  localStorage.setItem('poultry_auth_user', JSON.stringify({ username: user.username, role: user.role }));
+  sessionStorage.setItem('poultry_auth_user', JSON.stringify({ username: user.username, role: user.role }));
+  localStorage.removeItem('poultry_auth_user');
 }
 
 function getAllowedTabs() {
@@ -556,26 +601,53 @@ function hideLoginOverlay() {
   if (overlay) overlay.style.display = 'none';
 }
 
-function loginUser() {
+async function loginUser() {
+  const error = document.getElementById('loginError');
+  const now = Date.now();
+  // Brute-force lockout check
+  if (_loginState.lockedUntil > now) {
+    const secs = Math.ceil((_loginState.lockedUntil - now) / 1000);
+    if (error) error.textContent = `Слишком много попыток. Подождите ${secs} с.`;
+    return;
+  }
   const username = (document.getElementById('loginUser')?.value || '').trim();
   const password = document.getElementById('loginPass')?.value || '';
-  const found = AUTH_USERS.find(user => user.username === username && user.password === password);
-  const error = document.getElementById('loginError');
-  if (!found) {
+  // Sanitize inputs
+  if (!username || username.length > 64 || password.length > 128) {
     if (error) error.textContent = 'Неверный логин или пароль';
     return;
   }
+  const hash = await _sha256(password);
+  const found = AUTH_USERS.find(u => u.username === username && u.passwordHash === hash);
+  if (!found) {
+    _loginState.fails++;
+    if (_loginState.fails >= 5) {
+      _loginState.lockedUntil = now + 60000; // 60 sec lockout
+      _loginState.fails = 0;
+      _saveLoginState(_loginState);
+      if (error) error.textContent = 'Слишком много попыток. Подождите 30 с.';
+    } else {
+      _saveLoginState(_loginState);
+      if (error) error.textContent = `Неверный логин или пароль (попытка ${_loginState.fails}/5)`;
+    }
+    return;
+  }
+  _loginState.fails = 0;
+  _loginState.lockedUntil = 0;
+  _saveLoginState(_loginState);
   currentUser = { username: found.username, role: found.role, label: found.label };
   saveAuthUser(currentUser);
   if (error) error.textContent = '';
   hideLoginOverlay();
   applyAccessControl();
   switchTab(getAllowedTabs()[0] || 'home');
+  _resetSessionTimer();
   render();
 }
 
 function logoutUser() {
   if (!currentUser) return showLoginOverlay();
+  sessionStorage.removeItem('poultry_auth_user');
   localStorage.removeItem('poultry_auth_user');
   currentUser = null;
   applyAccessControl();
@@ -598,7 +670,9 @@ function applyAccessControl() {
   hideButtons(['exportDailyExcel', 'exportDailyPDF'], can('dailyReportExport'));
   hideButtons(['exportExcel', 'exportPDF'], can('dailyReportExport') || can('analyticsExport'));
   hideButtons(['exportAnalyticsExcel', 'exportAnalyticsPDF', 'sendAnalyticsWhatsApp', 'exportPeriodExcel'], can('analyticsExport'));
-  hideButtons(['exportPlanExcel', 'exportPlanVsActualExcel', 'savePlanTarget', 'clearPlanTarget'], can('planWrite'));
+  hideButtons(['exportPlanExcel', 'savePlanTarget', 'clearPlanTarget'], can('planWrite'));
+  hideButtons(['exportPlanVsActualExcel'], can('planWrite') || can('analyticsExport'));
+  hideButtons(['openShchitaModal', 'copyShchitaFromYesterday', 'saveShchitaData'], can('shchitaWrite'));
   hideButtons(['saveGsUrl', 'saveAutoSync', 'setPin', 'clearPin', 'backupData', 'restoreFile'], can('settingsWrite'));
   const badge = document.getElementById('userBadge');
   if (badge) badge.textContent = currentUser ? currentUser.label : 'Login';
@@ -1079,6 +1153,19 @@ async function pullFromCloud() {
       }
     } catch(e4) {}
 
+    // Pull חגים by date + slaughterhouse
+    try {
+      const resH = await fetch(url + '?type=holidays');
+      const cloudHolidays = await resH.json();
+      if (cloudHolidays && typeof cloudHolidays === 'object' && !Array.isArray(cloudHolidays) && !cloudHolidays.error) {
+        const localHolidays = getHolidays();
+        Object.entries(cloudHolidays).forEach(([key, holiday]) => {
+          if (key.includes('|') && holiday?.isHoliday) localHolidays[key] = holiday;
+        });
+        saveHolidays(localHolidays);
+      }
+    } catch(e_holidays) {}
+
     if (document.getElementById('derishotGrid')) renderDerishotGrid();
     if (document.getElementById('planDailyGrid')) renderPlanView();
 
@@ -1134,17 +1221,30 @@ async function saveRecord() {
       alert('נא לבחור משחטה או להזין משחטה ידנית');
       return;
     }
-    rememberFarm(farm);
-    rememberSlaughterhouse(slaughterhouse);
+    // Input validation + sanitization
+    const _clean = v => String(v||'').trim().replace(/[<>"'`]/g,'').slice(0,200);
+    const qtyNum = Number(qty);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0 || qtyNum > 500000) {
+      alert('כמות לא תקינה (1 – 500,000)');
+      return;
+    }
+    const farmClean = _clean(farm);
+    const slClean   = _clean(slaughterhouse);
+    const notesRaw  = document.getElementById('fNotes').value || '';
+    const notesClean = _clean(notesRaw).slice(0, 500);
+    if (!farmClean || !slClean) { alert('נתון לא תקין'); return; }
+
+    rememberFarm(farmClean);
+    rememberSlaughterhouse(slClean);
 
     const data = {
       id: editingId || Date.now().toString(36),
       datetime: document.getElementById('fDate').value || new Date().toISOString(),
-      farm: farm,
-      quantity: Number(qty),
-      slaughterhouse: slaughterhouse,
-      kashrut: document.getElementById('fKashrut').value || 'רגיל',
-      notes: document.getElementById('fNotes').value || '',
+      farm: farmClean,
+      quantity: Math.round(qtyNum),
+      slaughterhouse: slClean,
+      kashrut: _clean(document.getElementById('fKashrut').value || 'רגיל').slice(0,50),
+      notes: notesClean,
       status: 'pending'
     };
 
@@ -2352,6 +2452,27 @@ function restoreData(event) {
 // PIN PROTECTION
 // ===============================================
 let pinBuffer = '';
+let pinFails = 0;
+let pinLockedUntil = 0;
+
+function isHashedPin(value) {
+  return typeof value === 'string' && value.startsWith('sha256$');
+}
+
+async function hashPin(pin) {
+  return 'sha256$' + await _sha256('poultry-pin-v2:' + pin);
+}
+
+async function verifyPin(pin) {
+  if (!settings.pin) return true;
+  if (isHashedPin(settings.pin)) return settings.pin === await hashPin(pin);
+  const ok = pin === settings.pin;
+  if (ok) {
+    settings.pin = await hashPin(pin);
+    saveS();
+  }
+  return ok;
+}
 
 function showPinOverlay() {
   const overlay = document.getElementById('pinOverlay');
@@ -2369,16 +2490,28 @@ function hidePinOverlay() {
 }
 
 function pinPress(digit) {
+  const now = Date.now();
+  if (pinLockedUntil > now) {
+    const err = document.getElementById('pinError');
+    if (err) { err.style.display = 'block'; setTimeout(() => { err.style.display = 'none'; }, 2000); }
+    return;
+  }
   if (pinBuffer.length >= 4) return;
   pinBuffer += digit;
   updatePinDots();
   if (pinBuffer.length === 4) {
-    setTimeout(() => {
-      if (pinBuffer === (settings.pin || '')) {
+    setTimeout(async () => {
+      if (await verifyPin(pinBuffer)) {
         hidePinOverlay();
         pinBuffer = '';
+        pinFails = 0;
       } else {
         pinBuffer = '';
+        pinFails++;
+        if (pinFails >= 5) {
+          pinLockedUntil = Date.now() + 60000;
+          pinFails = 0;
+        }
         updatePinDots();
         const err = document.getElementById('pinError');
         if (err) { err.style.display = 'block'; setTimeout(() => { err.style.display = 'none'; }, 2000); }
@@ -2399,12 +2532,12 @@ function updatePinDots() {
   });
 }
 
-function setPin() {
+async function setPin() {
   if (!requirePermission('settingsWrite')) return;
   const newPin = prompt('הכנס קוד PIN חדש בן 4 ספרות:');
   if (newPin === null) return;
   if (!/^\d{4}$/.test(newPin)) { alert('קוד PIN חייב להכיל בדיוק 4 ספרות'); return; }
-  settings.pin = newPin;
+  settings.pin = await hashPin(newPin);
   saveS();
   renderPinStatus();
   toast('🔒 PIN הוגדר בהצלחה');
@@ -2956,6 +3089,7 @@ function getShchitaSlaughterhouses() {
 
 // ── Modal open/close ─────────────────────────────────
 function openShchitaModal() {
+  if (!requirePermission('shchitaWrite')) return;
   shchitaDate = getSafeIsoDate();
   const modal = document.getElementById('shchitaModal');
   if (modal) { modal.style.display = 'flex'; renderShchitaGrid(); }
@@ -3039,7 +3173,7 @@ function refreshShchitaBar(safeId, demand) {
 
 // ── Save ─────────────────────────────────────────────
 async function saveShchitaData() {
-  if (!requirePermission('planWrite')) return;
+  if (!requirePermission('shchitaWrite')) return;
   const slaughterhouses = getShchitaSlaughterhouses();
   const shchita = getShchita();
   if (!shchita[shchitaDate]) shchita[shchitaDate] = {};
@@ -3086,6 +3220,7 @@ async function saveShchitaData() {
 }
 
 function copyShchitaFromYesterday() {
+  if (!requirePermission('shchitaWrite')) return;
   const yesterday = new Date(shchitaDate);
   yesterday.setDate(yesterday.getDate() - 1);
   const yKey = getDateKey(yesterday);
@@ -3100,16 +3235,85 @@ function copyShchitaFromYesterday() {
   toast('📋 הועתק מ-' + yKey.split('-').reverse().join('.'));
 }
 
-function initShchitaPanel() {
-  // Show the FAB button
-  const fab = document.getElementById('shchitaFab');
-  if (fab) fab.style.display = 'flex';
-}
-
-
-
 const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 let planEditCtx = null;
+
+// ===============================================
+// HOLIDAYS SYSTEM (חגים)
+// ===============================================
+const HOLIDAY_NAMES = [
+  { group: '🇮🇱 חגי ישראל', name: 'ראש השנה' },
+  { group: '🇮🇱 חגי ישראל', name: 'יום כיפור' },
+  { group: '🇮🇱 חגי ישראל', name: 'סוכות' },
+  { group: '🇮🇱 חגי ישראל', name: 'שמיני עצרת / שמחת תורה' },
+  { group: '🇮🇱 חגי ישראל', name: 'חנוכה' },
+  { group: '🇮🇱 חגי ישראל', name: 'פורים' },
+  { group: '🇮🇱 חגי ישראל', name: 'פסח' },
+  { group: '🇮🇱 חגי ישראל', name: 'שביעי של פסח' },
+  { group: '🇮🇱 חגי ישראל', name: 'יום הזיכרון' },
+  { group: '🇮🇱 חגי ישראל', name: 'יום העצמאות' },
+  { group: '🇮🇱 חגי ישראל', name: 'שבועות' },
+  { group: '🇮🇱 חגי ישראל', name: 'תשעה באב' },
+  { group: '🇮🇱 חגי ישראל', name: 'שבת (מנוחה)' },
+  { group: '🕌 חגי ערבים', name: 'עיד אל-פיטר (פסח רמדאן)' },
+  { group: '🕌 חגי ערבים', name: 'עיד אל-אדחא (קורבן)' },
+  { group: '🕌 חגי ערבים', name: "ראס א-סנה אל-הג'רייה" },
+  { group: '🕌 חגי ערבים', name: 'מולד א-נביא' },
+  { group: '🕌 חגי ערבים', name: 'ליל אל-קדר' },
+  { group: '🕌 חגי ערבים', name: 'יום ירושלים' },
+  { group: '✝️ חגי נוצרים', name: "חג המולד (כריסמס)" },
+  { group: '✝️ חגי נוצרים', name: "פסחא (איסטר)" },
+  { group: '✝️ חגי נוצרים', name: "סנט ג'ורג' (4 במאי)" },
+  { group: '📅 אחר', name: 'שביתה / עיצומים' },
+  { group: '📅 אחר', name: 'תקלה טכנית' },
+  { group: '📅 אחר', name: 'יום מנוחה אחר' },
+];
+
+function getHolidayKey(dateKey, slaughter) {
+  return `${dateKey}|${slaughter || ''}`;
+}
+function normalizeHolidayStore(raw) {
+  const clean = {};
+  Object.entries(raw || {}).forEach(([key, value]) => {
+    if (!key.includes('|') || !value || typeof value !== 'object') return;
+    clean[key] = { isHoliday: !!value.isHoliday, name: value.name || '' };
+  });
+  return clean;
+}
+function getHolidays() {
+  try { return normalizeHolidayStore(JSON.parse(localStorage.getItem('poultry_holidays') || '{}')); } catch { return {}; }
+}
+function saveHolidays(data) {
+  localStorage.setItem('poultry_holidays', JSON.stringify(normalizeHolidayStore(data)));
+}
+function isHolidayDate(dk, slaughter) {
+  if (!slaughter) return Object.keys(getHolidays()).some(key => key.startsWith(dk + '|') && getHolidays()[key]?.isHoliday);
+  return !!(getHolidays()[getHolidayKey(dk, slaughter)]?.isHoliday);
+}
+function getHolidayName(dk, slaughter) {
+  if (slaughter) return getHolidays()[getHolidayKey(dk, slaughter)]?.name || '';
+  const found = Object.entries(getHolidays()).find(([key, value]) => key.startsWith(dk + '|') && value?.isHoliday);
+  return found?.[1]?.name || '';
+}
+function getHolidaySummary(dk, slaughterhouses) {
+  const holidays = getHolidays();
+  const items = (slaughterhouses || [])
+    .map(slaughter => ({ slaughter, holiday: holidays[getHolidayKey(dk, slaughter)] }))
+    .filter(item => item.holiday?.isHoliday);
+  const names = [...new Set(items.map(item => item.holiday.name).filter(Boolean))];
+  return {
+    count: items.length,
+    all: items.length > 0 && items.length === (slaughterhouses || []).length,
+    label: names.length ? names.join(', ') : (items.length ? 'חג' : '')
+  };
+}
+
+// Format ISO date as DD/MM/YYYY
+function isoToDisplay(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
 
 function getPlan() {
   try { return JSON.parse(localStorage.getItem('poultry_plan_daily') || '{}'); } catch { return {}; }
@@ -3160,20 +3364,70 @@ function openPlanModal(dateKey, slaughter) {
   const [y, m, d] = dateKey.split('-');
   const dayName = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][new Date(dateKey).getDay()];
   document.getElementById('planModalTitle').textContent = `🏭 ${slaughter}`;
-  document.getElementById('planModalSub').textContent = `יום ${dayName} — ${d}.${m}.${y}`;
-  document.getElementById('planTargetInput').value = current || '';
+  document.getElementById('planModalSub').textContent = `יום ${dayName} — ${d}/${m}/${y}`;
+
+  // Holiday state
+  const holidays = getHolidays();
+  const holidayKey = getHolidayKey(dateKey, slaughter);
+  const dayHoliday = holidays[holidayKey] || {};
+  const isHoliday = dayHoliday.isHoliday || false;
+
+  // Holiday section HTML
+  const groups = [...new Set(HOLIDAY_NAMES.map(h => h.group))];
+  const optionsHtml = groups.map(g =>
+    `<optgroup label="${escapeHtml(g)}">${HOLIDAY_NAMES.filter(h=>h.group===g).map(h=>`<option value="${escapeHtml(h.name)}"${dayHoliday.name===h.name?' selected':''}>${escapeHtml(h.name)}</option>`).join('')}</optgroup>`
+  ).join('');
+
+  const holidaySectionEl = document.getElementById('planHolidaySection');
+  if (holidaySectionEl) {
+    holidaySectionEl.innerHTML = `
+      <div style="margin-bottom:14px; padding:12px 14px; border-radius:14px; border:2px solid ${isHoliday?'#D32F2F':'var(--border)'}; background:${isHoliday?'#FFF3E0':'var(--surface)'}; transition:all 0.2s;">
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight:800; font-size:14px; color:${isHoliday?'#BF360C':'var(--text)'};">
+          <input type="checkbox" id="planHolidayToggle" ${isHoliday?'checked':''} onchange="onHolidayToggle()" style="width:18px; height:18px; cursor:pointer; accent-color:#D32F2F;">
+          🎌 סמן כחג — המכונה לא עובדת (יחושב כ-0)
+        </label>
+        <div id="planHolidayDropWrap" style="display:${isHoliday?'block':'none'}; margin-top:10px;">
+          <select id="planHolidaySelect"
+            style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #FFCCBC; background:#FFF8E1; color:#BF360C; font-size:13px; font-weight:700;">
+            <option value="">— בחר שם החג —</option>
+            ${optionsHtml}
+          </select>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById('planTargetInput').value = isHoliday ? '' : (current || '');
+  document.getElementById('planTargetInput').disabled = isHoliday;
+  document.getElementById('planTargetInput').style.opacity = isHoliday ? '0.4' : '1';
 
   // Quick buttons from recent values for this slaughterhouse
   const recent = new Set();
   Object.values(plan).forEach(day => { if (day[slaughter]) recent.add(day[slaughter]); });
   const top = [...recent].sort((a,b)=>b-a).slice(0,4);
   document.getElementById('planQuickBtns').innerHTML = top.map(v =>
-    `<button onclick="document.getElementById('planTargetInput').value=${v}" style="padding:8px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--primary); font-weight:800; font-size:13px; cursor:pointer;">${formatNumber(v)}</button>`
+    `<button onclick="if(!document.getElementById('planHolidayToggle').checked)document.getElementById('planTargetInput').value=${v}" style="padding:8px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--primary); font-weight:800; font-size:13px; cursor:pointer;">${formatNumber(v)}</button>`
   ).join('');
 
   planEditCtx = { dateKey, slaughter };
   document.getElementById('planModal').style.display = 'flex';
   setTimeout(() => document.getElementById('planTargetInput').focus(), 100);
+}
+
+function onHolidayToggle() {
+  const cb = document.getElementById('planHolidayToggle');
+  const wrap = document.getElementById('planHolidayDropWrap');
+  const inp = document.getElementById('planTargetInput');
+  const section = cb?.closest('div[style]');
+  if (!cb) return;
+  const isOn = cb.checked;
+  if (wrap) wrap.style.display = isOn ? 'block' : 'none';
+  if (inp) { inp.disabled = isOn; inp.style.opacity = isOn ? '0.4' : '1'; if (!isOn) inp.focus(); }
+  if (section) {
+    section.style.borderColor = isOn ? '#D32F2F' : 'var(--border)';
+    section.style.background  = isOn ? '#FFF3E0' : 'var(--surface)';
+    const lbl = section.querySelector('label');
+    if (lbl) lbl.style.color = isOn ? '#BF360C' : 'var(--text)';
+  }
 }
 
 function closePlanModal() {
@@ -3185,7 +3439,21 @@ function savePlanTarget() {
   if (!requirePermission('planWrite')) return;
   if (!planEditCtx) return;
   const { dateKey, slaughter } = planEditCtx;
-  const val = Number(document.getElementById('planTargetInput').value) || 0;
+  const isHoliday = document.getElementById('planHolidayToggle')?.checked || false;
+
+  // Save holiday data
+  const holidays = getHolidays();
+  const holidayKey = getHolidayKey(dateKey, slaughter);
+  if (isHoliday) {
+    const name = document.getElementById('planHolidaySelect')?.value || '';
+    holidays[holidayKey] = { isHoliday: true, name };
+  } else {
+    delete holidays[holidayKey];
+  }
+  saveHolidays(holidays);
+
+  // Save plan target (if not holiday)
+  const val = isHoliday ? 0 : (Number(document.getElementById('planTargetInput').value) || 0);
   const plan = getPlan();
   if (!plan[dateKey]) plan[dateKey] = {};
   if (val > 0) plan[dateKey][slaughter] = val;
@@ -3194,7 +3462,7 @@ function savePlanTarget() {
   savePlan(plan);
   closePlanModal();
   renderPlanView();
-  toast('✅ יעד נשמר');
+  toast(isHoliday ? `🎌 ${dateKey.split('-').reverse().join('/')} — סומן כחג` : '✅ יעד נשמר');
 
   // Sync to Google Sheets
   const url = getGsUrl();
@@ -3203,11 +3471,23 @@ function savePlanTarget() {
       method: 'POST', mode: 'no-cors',
       body: JSON.stringify({ type: 'tochnit', date: dateKey, slaughter, qty: val })
     }).catch(() => {});
+    fetch(url, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({
+        type: 'holidays',
+        date: dateKey,
+        slaughter,
+        isHoliday,
+        name: holidays[holidayKey]?.name || ''
+      })
+    }).catch(() => {});
   }
 }
 
 function clearPlanTarget() {
   if (!requirePermission('planWrite')) return;
+  const cb = document.getElementById('planHolidayToggle');
+  if (cb) { cb.checked = false; onHolidayToggle(); }
   document.getElementById('planTargetInput').value = '';
   savePlanTarget();
 }
@@ -3264,10 +3544,13 @@ function renderPlanView() {
     const dayPlan = normalizePlanMapForCalendar(plan[dk] || {});
     const dayActual = actualMap[dk] || {};
     const dayShchita = shchitaMap[dk] || {};
+    const holidaySummary = getHolidaySummary(dk, slaughterhouses);
+    const isHoliday = holidaySummary.count > 0;
+    const holidayName = holidaySummary.label;
 
-    const dayTotal = slaughterhouses.reduce((s,k) => s + (dayPlan[k]||0), 0);
-    const dayActualTotal = slaughterhouses.reduce((s,k) => s + (dayActual[k]||0), 0);
-    const dayShchitaTotal = slaughterhouses.reduce((s,k) => s + (dayShchita[k]||0), 0);
+    const dayTotal = slaughterhouses.reduce((sum, key) => sum + (isHolidayDate(dk, key) ? 0 : (dayPlan[key] || 0)), 0);
+    const dayActualTotal = slaughterhouses.reduce((sum, key) => sum + (isHolidayDate(dk, key) ? 0 : (dayActual[key] || 0)), 0);
+    const dayShchitaTotal = slaughterhouses.reduce((sum, key) => sum + (isHolidayDate(dk, key) ? 0 : (dayShchita[key] || 0)), 0);
     monthTarget += dayTotal;
     monthActual += dayActualTotal;
     monthShchita += dayShchitaTotal;
@@ -3276,8 +3559,15 @@ function renderPlanView() {
     const dayEffectiveActual = dayShchitaTotal > 0 ? dayShchitaTotal : dayActualTotal;
     const totalPct = dayTotal > 0 ? Math.round(dayEffectiveActual/dayTotal*100) : null;
 
-    const rowBg = isToday ? '#E8F5E9' : isSaturday ? '#FFF3E0' : isWeekend ? '#FFF8E1' : '';
+    const rowBg = holidaySummary.all ? '#FBE9E7' : isHoliday ? '#FFF8E1' : isToday ? '#E8F5E9' : isSaturday ? '#FFF3E0' : isWeekend ? '#FFF8E1' : '';
     const cells = slaughterhouses.map(s => {
+      if (isHolidayDate(dk, s)) {
+        const oneHolidayName = getHolidayName(dk, s);
+        return `<td style="padding:2px 3px; text-align:center; background:#FFCCBC; border-left:1px solid #eee; cursor:pointer;" onclick="openPlanModal('${dk}','${s}')" title="${escapeHtml(oneHolidayName || 'חג')}">
+          <div style="font-size:9px; color:#BF360C; font-weight:800;">🎌</div>
+          <div style="font-size:8px; color:#BF360C; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:46px; margin:auto;">${escapeHtml(oneHolidayName || 'חג')}</div>
+        </td>`;
+      }
       const target = dayPlan[s] || 0;
       const actual = dayActual[s] || 0;
       const shchita = dayShchita[s] || 0;
@@ -3294,11 +3584,17 @@ function renderPlanView() {
       </td>`;
     }).join('');
 
+    const dateColContent = isHoliday
+      ? `<span style="font-size:10px; color:#aaa; display:block;">${DAYS_HE[dow]}'</span>
+         <span style="color:#BF360C; font-weight:900;">${dd}/${mm}</span>
+         <div style="font-size:8px; color:#BF360C; font-weight:800; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:72px;" title="${escapeHtml(holidayName)}">🎌 ${holidaySummary.count}/${slaughterhouses.length} ${escapeHtml(holidayName||'חג')}</div>`
+      : `<span style="font-size:10px; color:#aaa; display:block;">${DAYS_HE[dow]}'</span>
+         <span style="${isToday ? 'color:#1B5E20;' : isSaturday ? 'color:#E65100;' : ''}">${dd}/${mm}</span>
+         ${dayTotal > 0 ? `<div style="font-size:9px; color:${totalPct >= 100 ? '#2E7D32' : totalPct >= 70 ? '#F57F17' : totalPct !== null ? '#C62828' : '#888'}; font-weight:800; margin-top:1px;">${totalPct !== null ? totalPct+'%' : '✏️'}</div>` : ''}`;
+
     rows += `<tr style="border-bottom:1px solid #eee; ${rowBg ? 'background:' + rowBg + ';' : ''}">
       <td style="padding:6px 8px; font-weight:${isToday?'900':'700'}; font-size:12px; white-space:nowrap; position:sticky; right:0; background:${rowBg||'var(--surface)'}; z-index:1; border-left:2px solid #ddd;">
-        <span style="font-size:10px; color:#aaa; display:block;">${DAYS_HE[dow]}'</span>
-        <span style="${isToday ? 'color:#1B5E20;' : isSaturday ? 'color:#E65100;' : ''}">${dd}/${mm}</span>
-        ${dayTotal > 0 ? `<div style="font-size:9px; color:${totalPct >= 100 ? '#2E7D32' : totalPct >= 70 ? '#F57F17' : totalPct !== null ? '#C62828' : '#888'}; font-weight:800; margin-top:1px;">${totalPct !== null ? totalPct+'%' : '✏️'}</div>` : ''}
+        ${dateColContent}
       </td>
       ${cells}
     </tr>`;
@@ -3325,6 +3621,7 @@ function renderPlanView() {
       <span>🟢 ירוק = יעד תכנון</span>
       <span>🔵 <b>✅ כחול</b> = שחיטה בפועל</span>
       <span>⚫ אפור = שיווק (כשאין שחיטה)</span>
+      <span>🎌 <b style="color:#BF360C;">אדום</b> = חג (לא עובדים)</span>
     </div>`;
 
   const summary = document.getElementById('planMonthlySummary');
@@ -3664,12 +3961,21 @@ function getPlanVsActualForRange(startIso, endIso) {
   const dailyRows = []; // { date, bySlaughter: { s: {planned,shchita,shivukim} } }
 
   dates.forEach(dk => {
-    // prefer derishott over plan
-    const dayPlan = Object.keys((derishott[dk]||{})).length > 0
+    // prefer derishott over plan; holidays count as 0 only for the marked slaughterhouse
+    const dayPlanRaw = (Object.keys((derishott[dk]||{})).length > 0
       ? normalizePlanMapForCalendar(derishott[dk])
-      : normalizePlanMapForCalendar((plan[dk]||{}));
-    const dayShchita  = shchita[dk]   || {};
-    const dayShivukim = shivukimMap[dk] || {};
+      : normalizePlanMapForCalendar((plan[dk]||{})));
+    const dayShchitaRaw  = shchita[dk] || {};
+    const dayShivukimRaw = shivukimMap[dk] || {};
+    const dayPlan = {};
+    const dayShchita = {};
+    const dayShivukim = {};
+    slaughterhouses.forEach(s => {
+      if (isHolidayDate(dk, s)) return;
+      dayPlan[s] = dayPlanRaw[s] || 0;
+      dayShchita[s] = dayShchitaRaw[s] || 0;
+      dayShivukim[s] = dayShivukimRaw[s] || 0;
+    });
 
     const dayRow = { date: dk, bySlaughter: {} };
 
@@ -3748,7 +4054,7 @@ function buildPlanVsActualChartSvg(activeSlaughterhouses, bySlaughter, periodLab
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">
     <rect width="${width}" height="${height}" rx="20" fill="${bg}"/>
     <text x="${width-20}" y="40" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="800" fill="#12381B">תכנון מול ביצוע | ${escapeXml(periodLabel)}</text>
-    <text x="${width-20}" y="58" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#888">% = (שחיטה בפועל / תכנון)</text>
+    <text x="${width-20}" y="58" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#888">% = (שחיטה בפועל / תכנון) — שיווקים כגיבוי אם אין שחיטה</text>
     ${rows}
     ${legend}
   </svg>`;
@@ -3776,32 +4082,48 @@ async function exportPeriodExcel() {
       const overlay = document.createElement('div');
       overlay.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;';
       overlay.setAttribute('data-pm','');
+      // Default selection: current week
+      overlay.dataset.sel = 'wk';
+
+      const BTN_ACTIVE_GREEN  = 'padding:12px;border-radius:12px;border:3px solid #1B5E20;background:#1B5E20;color:#fff;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(27,94,32,0.3);';
+      const BTN_IDLE_GREEN    = 'padding:12px;border-radius:12px;border:2px solid #1B5E20;background:#E8F5E9;color:#1B5E20;font-weight:800;font-size:13px;cursor:pointer;';
+      const BTN_ACTIVE_BLUE   = 'padding:12px;border-radius:12px;border:3px solid #1565C0;background:#1565C0;color:#fff;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(21,101,192,0.3);';
+      const BTN_IDLE_BLUE     = 'padding:12px;border-radius:12px;border:2px solid #1565C0;background:#E3F2FD;color:#1565C0;font-weight:800;font-size:13px;cursor:pointer;';
+      const BTN_ACTIVE_GRAY   = 'padding:12px;border-radius:12px;border:3px solid #333;background:#333;color:#fff;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+      const BTN_IDLE_GRAY     = 'padding:12px;border-radius:12px;border:2px solid #888;background:#f5f5f5;color:#333;font-weight:800;font-size:13px;cursor:pointer;';
+
+      const DSTYLE = 'flex:1;padding:8px 4px 8px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;min-width:0;';
+      const ICAL   = 'padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:16px;cursor:pointer;line-height:1;';
+
       overlay.innerHTML=`
         <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;">
           <div style="font-weight:800;font-size:18px;margin-bottom:2px;">📅 דוח תכנון מול ביצוע — תקופתי</div>
           <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">תכנון שחיטה מול שחיטה בפועל לפי משחטות</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-            <button onclick="this.closest('[data-pm]').dataset.sel='wk'"
-              style="padding:12px;border-radius:12px;border:2px solid #1B5E20;background:#E8F5E9;color:#1B5E20;font-weight:800;font-size:13px;cursor:pointer;">
+            <button id="prBtnWk"  style="${BTN_ACTIVE_GREEN}">
               📅 השבוע<br><span style="font-size:10px;font-weight:500;">${fmt(weekStart)} – ${fmt(weekEnd)}</span></button>
-            <button onclick="this.closest('[data-pm]').dataset.sel='mo'"
-              style="padding:12px;border-radius:12px;border:2px solid #1565C0;background:#E3F2FD;color:#1565C0;font-weight:800;font-size:13px;cursor:pointer;">
+            <button id="prBtnMo"  style="${BTN_IDLE_BLUE}">
               🗓 החודש<br><span style="font-size:10px;font-weight:500;">${fmt(monthStart)} – ${fmt(monthEnd)}</span></button>
-            <button onclick="this.closest('[data-pm]').dataset.sel='pwk'"
-              style="padding:12px;border-radius:12px;border:2px solid #555;background:#f5f5f5;color:#333;font-weight:800;font-size:13px;cursor:pointer;">
+            <button id="prBtnPwk" style="${BTN_IDLE_GRAY}">
               ⬅️ שבוע שעבר<br><span style="font-size:10px;font-weight:500;">${fmt(prevWS)} – ${fmt(prevWE)}</span></button>
-            <button onclick="this.closest('[data-pm]').dataset.sel='pmo'"
-              style="padding:12px;border-radius:12px;border:2px solid #555;background:#f5f5f5;color:#333;font-weight:800;font-size:13px;cursor:pointer;">
+            <button id="prBtnPmo" style="${BTN_IDLE_GRAY}">
               ⬅️ חודש שעבר<br><span style="font-size:10px;font-weight:500;">${fmt(prevMS)} – ${fmt(prevME)}</span></button>
           </div>
-          <div style="background:var(--bg);border-radius:12px;padding:10px 12px;border:1px solid var(--border);margin-bottom:12px;">
+          <div id="prCustomBox" style="background:var(--bg);border-radius:12px;padding:10px 12px;border:2px solid var(--border);margin-bottom:12px;transition:border-color 0.2s;">
             <div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--text-secondary);">✏️ טווח מותאם:</div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input type="date" id="prFrom" value="${iso(weekStart)}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;">
-              <span style="color:var(--text-secondary);">עד</span>
-              <input type="date" id="prTo" value="${today}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;">
-              <button onclick="this.closest('[data-pm]').dataset.sel='custom'"
-                style="padding:8px 12px;border-radius:8px;border:none;background:#1B5E20;color:#fff;font-weight:800;font-size:12px;cursor:pointer;">✔</button>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;">
+              <button id="prCalFrom" style="${ICAL}" title="בחר תאריך התחלה">📅</button>
+              <div style="display:flex;flex-direction:column;gap:2px;flex:1;">
+                <input type="date" id="prFrom" value="${iso(weekStart)}" style="${DSTYLE}">
+                <span id="prFromLabel" style="font-size:10px;font-weight:800;color:#1B5E20;text-align:center;">${fmt(weekStart)}</span>
+              </div>
+              <span style="color:var(--text-secondary);white-space:nowrap;">עד</span>
+              <div style="display:flex;flex-direction:column;gap:2px;flex:1;">
+                <input type="date" id="prTo" value="${today}" style="${DSTYLE}">
+                <span id="prToLabel" style="font-size:10px;font-weight:800;color:#1B5E20;text-align:center;">${fmt(todayObj)}</span>
+              </div>
+              <button id="prCalTo" style="${ICAL}" title="בחר תאריך סיום">📅</button>
+              <button id="prConfirmCustom" style="padding:8px 12px;border-radius:8px;border:2px solid #ccc;background:#eee;color:#999;font-weight:800;font-size:14px;cursor:pointer;transition:all 0.2s;" title="אשר טווח מותאם" disabled>✔</button>
             </div>
           </div>
           <div style="display:flex;gap:10px;">
@@ -3810,12 +4132,100 @@ async function exportPeriodExcel() {
           </div>
         </div>`;
       document.body.appendChild(overlay);
+
       const ranges={wk:[iso(weekStart),iso(weekEnd)],mo:[iso(monthStart),iso(monthEnd)],pwk:[iso(prevWS),iso(prevWE)],pmo:[iso(prevMS),iso(prevME)]};
+
+      // Helper: set selected period button (visual feedback)
+      function _prSelectBtn(sel) {
+        overlay.dataset.sel = sel;
+        const map = {
+          prBtnWk:  { id:'prBtnWk',  active: BTN_ACTIVE_GREEN, idle: BTN_IDLE_GREEN  },
+          prBtnMo:  { id:'prBtnMo',  active: BTN_ACTIVE_BLUE,  idle: BTN_IDLE_BLUE   },
+          prBtnPwk: { id:'prBtnPwk', active: BTN_ACTIVE_GRAY,  idle: BTN_IDLE_GRAY   },
+          prBtnPmo: { id:'prBtnPmo', active: BTN_ACTIVE_GRAY,  idle: BTN_IDLE_GRAY   },
+        };
+        const selBtnId = sel === 'wk' ? 'prBtnWk' : sel === 'mo' ? 'prBtnMo' : sel === 'pwk' ? 'prBtnPwk' : sel === 'pmo' ? 'prBtnPmo' : null;
+        Object.values(map).forEach(({ id, active, idle }) => {
+          const el = document.getElementById(id);
+          if (el) el.style.cssText = id === selBtnId ? active : idle;
+        });
+        // Reset custom box border if not custom
+        const customBox = document.getElementById('prCustomBox');
+        if (customBox) customBox.style.borderColor = sel === 'custom' ? '#1B5E20' : 'var(--border)';
+        // Reset confirm button
+        const confirmBtn = document.getElementById('prConfirmCustom');
+        if (confirmBtn && sel !== 'custom') {
+          confirmBtn.disabled = true;
+          confirmBtn.style.cssText = 'padding:8px 12px;border-radius:8px;border:2px solid #ccc;background:#eee;color:#999;font-weight:800;font-size:14px;cursor:pointer;transition:all 0.2s;';
+        }
+      }
+
+      // Period buttons
+      document.getElementById('prBtnWk').onclick  = () => _prSelectBtn('wk');
+      document.getElementById('prBtnMo').onclick  = () => _prSelectBtn('mo');
+      document.getElementById('prBtnPwk').onclick = () => _prSelectBtn('pwk');
+      document.getElementById('prBtnPmo').onclick = () => _prSelectBtn('pmo');
+
+      // Clickable calendar icons → open date picker
+      document.getElementById('prCalFrom').onclick = (e) => {
+        e.preventDefault();
+        const inp = document.getElementById('prFrom');
+        try { inp.showPicker?.(); } catch(_) { inp.focus(); inp.click(); }
+      };
+      document.getElementById('prCalTo').onclick = (e) => {
+        e.preventDefault();
+        const inp = document.getElementById('prTo');
+        try { inp.showPicker?.(); } catch(_) { inp.focus(); inp.click(); }
+      };
+
+      // When user changes dates → activate ✔ confirm button
+      function _onDateChange() {
+        const confirmBtn = document.getElementById('prConfirmCustom');
+        const customBox  = document.getElementById('prCustomBox');
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.style.cssText = 'padding:8px 12px;border-radius:8px;border:none;background:#1B5E20;color:#fff;font-weight:800;font-size:14px;cursor:pointer;transition:all 0.2s;box-shadow:0 2px 6px rgba(27,94,32,0.3);';
+        }
+        if (customBox) customBox.style.borderColor = '#1B5E20';
+        // Update DD/MM/YYYY labels
+        const fromVal = document.getElementById('prFrom')?.value;
+        const toVal   = document.getElementById('prTo')?.value;
+        const fromLbl = document.getElementById('prFromLabel');
+        const toLbl   = document.getElementById('prToLabel');
+        if (fromLbl && fromVal) fromLbl.textContent = isoToDisplay(fromVal);
+        if (toLbl   && toVal)   toLbl.textContent   = isoToDisplay(toVal);
+      }
+      document.getElementById('prFrom').onchange = _onDateChange;
+      document.getElementById('prTo').onchange   = _onDateChange;
+
+      // ✔ confirm custom range
+      document.getElementById('prConfirmCustom').onclick = () => {
+        const s = document.getElementById('prFrom').value;
+        const e = document.getElementById('prTo').value;
+        if (s && e) {
+          overlay.dataset.sel = 'custom';
+          // Deselect all period buttons
+          ['prBtnWk','prBtnMo','prBtnPwk','prBtnPmo'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+              if (id === 'prBtnWk') el.style.cssText = BTN_IDLE_GREEN;
+              else if (id === 'prBtnMo') el.style.cssText = BTN_IDLE_BLUE;
+              else el.style.cssText = BTN_IDLE_GRAY;
+            }
+          });
+          // Visual confirmation
+          const cb = document.getElementById('prCustomBox');
+          if (cb) cb.style.borderColor = '#1B5E20';
+          toast('✔ טווח מותאם נבחר');
+        }
+      };
+
       document.getElementById('prOk').onclick=()=>{
         const sel=overlay.dataset.sel;
         let s,e;
         if(sel==='custom'){s=document.getElementById('prFrom').value;e=document.getElementById('prTo').value;}
         else if(ranges[sel]){[s,e]=ranges[sel];}else{[s,e]=ranges['wk'];}
+        if(!s||!e){toast('⚠️ יש לבחור תקופה'); return;}
         document.body.removeChild(overlay); resolve({start:s,end:e});
       };
       document.getElementById('prCancel').onclick=()=>{document.body.removeChild(overlay);resolve(null);};
@@ -3892,36 +4302,52 @@ async function exportPeriodExcel() {
     ws1.getRow(4).height = 26;
 
     // שורות נתונים
+    const EXTERNAL_SL = ['מסלק אל קודס', 'חוסם (תרקומייה)']; // משחטות חיצוניות: שיווקים = שחיטה בפועל
     let cr = 5;
     slaughters.forEach((s, i) => {
       const d = bySlaughter[s];
-      const effective = d.shchita > 0 ? d.shchita : d.shivukim;
+      const isExternal = EXTERNAL_SL.includes(s);
+      // עבור משחטות חיצוניות: שיווקים הם ביצוע בפועל
+      const effective = isExternal ? d.shivukim : (d.shchita > 0 ? d.shchita : d.shivukim);
+      const shchitaDisplay  = isExternal ? d.shivukim : d.shchita;  // מה להציג בעמודת שחיטה
+      const shivukimDisplay = isExternal ? 0          : d.shivukim; // מה להציג בעמודת שיווקים
       const pct = d.planned > 0 ? effective / d.planned : null;
       const diff = d.planned > 0 ? effective - d.planned : null;
       const pctColor = pct===null?'FF999999':pct>=1?'FF2E7D32':pct>=0.7?'FFF57F17':'FFC62828';
       const rowBg = i%2===0 ? 'FFF9FCF9' : 'FFFFFFFF';
 
       const row = ws1.getRow(cr++);
-      row.values = [s, d.planned||'—', d.shchita>0?d.shchita:'—', d.shivukim>0?d.shivukim:'—', pct, diff];
+      row.values = [s, d.planned||'—', shchitaDisplay>0?shchitaDisplay:'—', shivukimDisplay>0?shivukimDisplay:'—', pct, diff];
       row.height = 24;
       row.getCell(1).font = { bold:true };
       row.getCell(1).alignment = { horizontal:'right' };
-      if (d.planned>0)   { row.getCell(2).numFmt='#,##0'; }
-      if (d.shchita>0)   { row.getCell(3).numFmt='#,##0'; row.getCell(3).font={bold:true,color:{argb:'FF1565C0'}}; }
-      if (d.shivukim>0)  { row.getCell(4).numFmt='#,##0'; }
-      if (pct!==null)    { row.getCell(5).numFmt='0%'; row.getCell(5).font={bold:true,color:{argb:pctColor}}; }
-      if (diff!==null)   { row.getCell(6).numFmt='+#,##0;-#,##0;0'; row.getCell(6).font={bold:true,color:{argb:diff>=0?'FF2E7D32':'FFC62828'}}; }
+      if (d.planned>0)          { row.getCell(2).numFmt='#,##0'; }
+      if (shchitaDisplay>0)     { row.getCell(3).numFmt='#,##0'; row.getCell(3).font={bold:true,color:{argb:'FF1565C0'}}; }
+      if (shivukimDisplay>0)    { row.getCell(4).numFmt='#,##0'; }
+      if (pct!==null)           { row.getCell(5).numFmt='0%'; row.getCell(5).font={bold:true,color:{argb:pctColor}}; }
+      if (diff!==null)          { row.getCell(6).numFmt='+#,##0;-#,##0;0'; row.getCell(6).font={bold:true,color:{argb:diff>=0?'FF2E7D32':'FFC62828'}}; }
       row.eachCell((cell,col)=>{ if(col<=6){ cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}}; cell.border={top:{style:'thin',color:{argb:'FFD6E2D9'}},left:{style:'thin',color:{argb:'FFD6E2D9'}},bottom:{style:'thin',color:{argb:'FFD6E2D9'}},right:{style:'thin',color:{argb:'FFD6E2D9'}}}; cell.alignment={horizontal:'center',vertical:'middle'}; } });
       row.getCell(1).alignment={horizontal:'right',vertical:'middle'};
     });
 
     // שורת סה"כ
     ws1.addRow([]);
-    const totEffective = totals.shchita>0?totals.shchita:totals.shivukim;
+    // BUG FIX: effective per row = shchita if available, else shivukim.
+    // External slaughterhouses (Husam, Maslak): shivukim IS the actual execution.
+    const totEffective = slaughters.reduce((acc, s) => {
+      const d = bySlaughter[s];
+      const isExt = EXTERNAL_SL.includes(s);
+      return acc + (isExt ? d.shivukim : (d.shchita > 0 ? d.shchita : d.shivukim));
+    }, 0);
+    // Shivukim total: only non-external slaughterhouses (external show in bitsua column)
+    const totShivukimDisplay = slaughters.reduce((acc, s) => {
+      if (EXTERNAL_SL.includes(s)) return acc;
+      return acc + bySlaughter[s].shivukim;
+    }, 0);
     const totPct = totals.planned>0?totEffective/totals.planned:null;
     const totDiff= totals.planned>0?totEffective-totals.planned:null;
     const totRow = ws1.getRow(cr+1);
-    totRow.values = ['סה"כ', totals.planned||'—', totals.shchita>0?totals.shchita:'—', totals.shivukim>0?totals.shivukim:'—', totPct, totDiff];
+    totRow.values = ['סה"כ', totals.planned||'—', totEffective>0?totEffective:'—', totShivukimDisplay>0?totShivukimDisplay:'—', totPct, totDiff];
     totRow.height = 28;
     totRow.eachCell((cell,col)=>{
       if(col>6)return;
@@ -3930,11 +4356,11 @@ async function exportPeriodExcel() {
       cell.alignment={horizontal:'center',vertical:'middle'};
       cell.border={top:{style:'medium'},left:{style:'thin'},bottom:{style:'medium'},right:{style:'thin'}};
     });
-    if(totals.planned>0)   totRow.getCell(2).numFmt='#,##0';
-    if(totals.shchita>0)   totRow.getCell(3).numFmt='#,##0';
-    if(totals.shivukim>0)  totRow.getCell(4).numFmt='#,##0';
-    if(totPct!==null)      totRow.getCell(5).numFmt='0%';
-    if(totDiff!==null)     totRow.getCell(6).numFmt='+#,##0;-#,##0;0';
+    if(totals.planned>0)        totRow.getCell(2).numFmt='#,##0';
+    if(totEffective>0)          { totRow.getCell(3).numFmt='#,##0'; }
+    if(totShivukimDisplay>0)    totRow.getCell(4).numFmt='#,##0';
+    if(totPct!==null)           totRow.getCell(5).numFmt='0%';
+    if(totDiff!==null)          totRow.getCell(6).numFmt='+#,##0;-#,##0;0';
 
     // הוספת גרף
     const chartSvg = buildPlanVsActualChartSvg(slaughters, bySlaughter, periodLabel);
@@ -3953,7 +4379,7 @@ async function exportPeriodExcel() {
     const ws2 = wb.addWorksheet('פירוט יומי', { views:[{rightToLeft:true, state:'frozen', xSplit:1, ySplit:3}] });
     ws2.pageSetup = { orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0 };
 
-    const colsNeeded = 1 + slaughters.length * 2 + 1; // תאריך + (תכנון+ביצוע)×n + סה"כ
+    const colsNeeded = 1 + slaughters.length * 2 + 3; // תאריך + (תכנון+ביצוע)×n + סה"כ תכנון + סה"כ ביצוע + סה"כ יומי
     ws2.mergeCells(1,1,1,colsNeeded);
     const h2t = ws2.getCell(1,1);
     h2t.value = `פירוט יומי — תכנון מול שחיטה בפועל | ${periodLabel}`;
@@ -3974,7 +4400,10 @@ async function exportPeriodExcel() {
     });
     ws2.mergeCells(2,ci,2,ci);
     const totHeader=ws2.getCell(2,ci);
-    totHeader.value='סה"כ'; totHeader.font={bold:true,color:{argb:'FFFFFFFF'}}; totHeader.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1B5E20'}}; totHeader.alignment={horizontal:'center'};
+    totHeader.value='סה"כ תכנון'; totHeader.font={bold:true,color:{argb:'FFFFFFFF'}}; totHeader.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF2E7D32'}}; totHeader.alignment={horizontal:'center'};
+    ws2.mergeCells(2,ci+1,2,ci+1);
+    const totBitzuaHeader=ws2.getCell(2,ci+1);
+    totBitzuaHeader.value='סה"כ ביצוע'; totBitzuaHeader.font={bold:true,color:{argb:'FFFFFFFF'}}; totBitzuaHeader.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1565C0'}}; totBitzuaHeader.alignment={horizontal:'center'};
     ws2.getRow(2).height=22;
 
     // Row 3: sub-headers (תכנון / ביצוע per slaughterhouse)
@@ -3992,7 +4421,8 @@ async function exportPeriodExcel() {
       });
       ci+=2;
     });
-    ws2.getCell(3,ci).value='סה"כ יומי'; ws2.getCell(3,ci).font={bold:true,color:{argb:'FFFFFFFF'}}; ws2.getCell(3,ci).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1B5E20'}}; ws2.getCell(3,ci).alignment={horizontal:'center'};
+    ws2.getCell(3,ci).value='סה"כ תכנון'; ws2.getCell(3,ci).font={bold:true,color:{argb:'FFFFFFFF'}}; ws2.getCell(3,ci).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF388E3C'}}; ws2.getCell(3,ci).alignment={horizontal:'center'};
+    ws2.getCell(3,ci+1).value='סה"כ ביצוע'; ws2.getCell(3,ci+1).font={bold:true,color:{argb:'FFFFFFFF'}}; ws2.getCell(3,ci+1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1565C0'}}; ws2.getCell(3,ci+1).alignment={horizontal:'center'};
     ws2.getRow(3).height=20;
 
     // Data rows
@@ -4006,15 +4436,18 @@ async function exportPeriodExcel() {
       let dayTotalEffective=0, dayTotalPlan=0;
       slaughters.forEach(s=>{
         const sd=dayRow.bySlaughter[s]||{planned:0,shchita:0,shivukim:0};
-        const eff=sd.shchita>0?sd.shchita:sd.shivukim;
+        const isExt = EXTERNAL_SL.includes(s);
+        const eff = isExt ? sd.shivukim : (sd.shchita>0?sd.shchita:sd.shivukim);
         vals.push(sd.planned||''); vals.push(eff||'');
         dayTotalPlan+=sd.planned; dayTotalEffective+=eff;
       });
-      vals.push(dayTotalEffective||'');
+      vals.push(dayTotalPlan||'');    // סה"כ תכנון
+      vals.push(dayTotalEffective||''); // סה"כ ביצוע
       row.values=vals;
       const isToday=dayRow.date===getSafeIsoDate();
       const isSat=d.getDay()===6;
       const rowBg=isToday?'FFE8F5E9':isSat?'FFFFF3E0':idx%2===0?'FFF9FCF9':'FFFFFFFF';
+      const nCols = 1 + slaughters.length*2 + 2;
       row.eachCell((cell,col)=>{
         cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg}};
         cell.alignment={horizontal:'center',vertical:'middle'};
@@ -4022,6 +4455,9 @@ async function exportPeriodExcel() {
         if(typeof cell.value==='number') cell.numFmt='#,##0';
         // Color ביצוע columns blue
         if(col>1&&col<=1+slaughters.length*2&&(col-1)%2===0) { if(cell.value>0) cell.font={bold:true,color:{argb:'FF1565C0'}}; }
+        // Color סה"כ תכנון green, סה"כ ביצוע blue
+        if(col===nCols-1&&cell.value>0) cell.font={bold:true,color:{argb:'FF2E7D32'}};
+        if(col===nCols&&cell.value>0)   cell.font={bold:true,color:{argb:'FF1565C0'}};
       });
       row.getCell(1).font={bold:isToday,color:{argb:isToday?'FF1B5E20':isSat?'FFE65100':'FF333333'}};
     });
@@ -4029,17 +4465,23 @@ async function exportPeriodExcel() {
     // Totals row
     const totR=ws2.getRow(r4);
     const totVals=['סה"כ'];
-    let grandEff=0;
+    let grandPlan=0, grandEff=0;
     slaughters.forEach(s=>{
+      const isExt = EXTERNAL_SL.includes(s);
       totVals.push(bySlaughter[s].planned||'');
-      const eff=bySlaughter[s].shchita>0?bySlaughter[s].shchita:bySlaughter[s].shivukim;
-      totVals.push(eff||''); grandEff+=eff;
+      const eff=isExt ? bySlaughter[s].shivukim : (bySlaughter[s].shchita>0?bySlaughter[s].shchita:bySlaughter[s].shivukim);
+      totVals.push(eff||''); grandEff+=eff; grandPlan+=bySlaughter[s].planned;
     });
-    totVals.push(grandEff||'');
+    totVals.push(grandPlan||'');  // סה"כ תכנון
+    totVals.push(grandEff||'');   // סה"כ ביצוע
     totR.values=totVals; totR.height=26;
     totR.eachCell((cell,col)=>{
+      const nCols2 = 1 + slaughters.length*2 + 2;
+      const isTihnunCol = col===nCols2-1;
+      const isBitzuaCol = col>1&&col<=1+slaughters.length*2&&(col-1)%2===0;
+      const isSumBitzua = col===nCols2;
       cell.font={bold:true,color:{argb:'FFFFFFFF'},size:12};
-      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:col>1&&col<=1+slaughters.length*2&&(col-1)%2===0?'FF1565C0':'FF1B5E20'}};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb: isBitzuaCol||isSumBitzua?'FF1565C0':isTihnunCol?'FF388E3C':'FF1B5E20'}};
       cell.alignment={horizontal:'center',vertical:'middle'};
       if(typeof cell.value==='number') cell.numFmt='#,##0';
     });
@@ -4047,7 +4489,8 @@ async function exportPeriodExcel() {
     // Column widths for ws2
     ws2.getColumn(1).width=14;
     ci=2; slaughters.forEach(()=>{ ws2.getColumn(ci).width=11; ws2.getColumn(ci+1).width=11; ci+=2; });
-    ws2.getColumn(ci).width=13;
+    ws2.getColumn(ci).width=14;   // סה"כ תכנון
+    ws2.getColumn(ci+1).width=14; // סה"כ ביצוע
 
     const buffer = await wb.xlsx.writeBuffer();
     downloadBlob(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
@@ -4078,7 +4521,6 @@ try {
   populateSlaughterSelect('');
   initPlanYearSelect();
   initDerishotPanel();
-  initShchitaPanel();
   startAutoSync();
   switchTab(currentTab);
   render();
@@ -4104,6 +4546,8 @@ try {
       try { const r=await fetch(url+'?type=derishott'); const d=await r.json(); if(d&&!Array.isArray(d)&&!d.error){ const lo=getDerishott(); Object.entries(d).forEach(([dt,sl])=>{ if(!lo[dt]) lo[dt]={}; Object.assign(lo[dt],sl); }); saveDerishotStorage(lo); } } catch(e){}
       // תכנון
       try { const r=await fetch(url+'?type=tochnit'); const d=await r.json(); if(d&&!Array.isArray(d)&&!d.error){ const lo=getPlan(); Object.entries(d).forEach(([dt,sl])=>{ if(!lo[dt]) lo[dt]={}; Object.assign(lo[dt],sl); }); savePlan(lo); } } catch(e){}
+      // חגים
+      try { const r=await fetch(url+'?type=holidays'); const d=await r.json(); if(d&&!Array.isArray(d)&&!d.error){ const lo=getHolidays(); Object.entries(d).forEach(([dt,hd])=>{ lo[dt]=hd; }); saveHolidays(lo); } } catch(e){}
       // שחיטה בפועל
       showCloudOverlay('טוען שחיטה בפועל...');
       try { const r=await fetch(url+'?type=shchita'); const d=await r.json(); if(d&&!Array.isArray(d)&&!d.error){ const lo=getShchita(); Object.entries(d).forEach(([dt,sl])=>{ if(!lo[dt]) lo[dt]={}; Object.assign(lo[dt],sl); }); saveShchitaStorage(lo); } } catch(e){}
@@ -4157,17 +4601,6 @@ try {
     </div>
   </div>
 </div>
-
-<button id="shchitaFab"
-  onclick="openShchitaModal()"
-  style="display:none; position:fixed; bottom:80px; left:16px; z-index:900;
-         background:linear-gradient(135deg,#1565C0,#1976D2);
-         color:#fff; border:none; border-radius:50px;
-         padding:13px 18px; font-size:13px; font-weight:800;
-         box-shadow:0 4px 16px rgba(21,101,192,0.5);
-         cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:7px;">
-  ✅ שחיטה בפועל
-</button>
 
 <div id="cloudLoadOverlay" style="display:none; position:fixed; inset:0; z-index:5000; background:linear-gradient(135deg,#1B5E20,#2E7D32); flex-direction:column; align-items:center; justify-content:center; gap:18px;">
   <div id="cloudLoadLogo" style="width:72px; height:72px; background:#fff; border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:36px; box-shadow:0 4px 20px rgba(0,0,0,0.3);">🐔</div>
